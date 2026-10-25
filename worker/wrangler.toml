@@ -3,6 +3,4 @@ main = "garmin-proxy.js"
 compatibility_date = "2026-10-25"
 
 [vars]
-# Replace this with your GitHub Pages origin, for example:
-# https://your-user.github.io
-ALLOWED_ORIGIN = "https://your-user.github.io"
+ALLOWED_ORIGIN = "https://truedevopsmk-lab.github.io"
