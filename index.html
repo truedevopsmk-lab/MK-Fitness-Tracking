@@ -1,2 +1,33 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#20c997"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-title" content="MK Fitness"/><link rel="apple-touch-icon" href="./icon.svg"/><title>MK's Fitness Dashboard</title></head><body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body></html>
+<html lang="en" data-theme="night">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#071014" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="MK Fitness" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="MK's personal Garmin fitness and recovery dashboard" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <title>MK's Fitness Dashboard</title>
+  <style>
+    html { background: #071014 } html[data-theme=day] { background: #f2f6f5 } html[data-theme=color] { background: #110e1d }
+    @media (prefers-color-scheme: light) { html[data-theme=auto] { background: #f2f6f5 } }
+    #boot { position: fixed; inset: 0; display: grid; place-items: center; font: 700 22px/1 'Space Grotesk', system-ui, sans-serif; letter-spacing: .16em; color: #20c997 }
+    #boot span { color: #eaf4f2; font-weight: 400; margin-left: .4em } html[data-theme=day] #boot span { color: #0c1a1e }
+    @media (prefers-color-scheme: light) { html[data-theme=auto] #boot span { color: #0c1a1e } }
+  </style>
+</head>
+<body>
+  <div id="boot" aria-hidden="true">MK<span>FITNESS</span></div>
+  <div id="root"></div>
+  <noscript>MK Fitness needs JavaScript to read your Garmin data on this device.</noscript>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>

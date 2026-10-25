@@ -5,3 +5,11 @@ node_modules/
 .env.*
 !.env.example
 dist/
+
+# Personal data exports from the app — never commit these
+mk-fitness-export-*
+mk-fitness-*.csv
+*.export.json
+
+# Local tooling
+worker/.wrangler/

@@ -1,0 +1,51 @@
+/* Trends index + detail */
+.trend-group { display: flex; flex-direction: column; gap: 10px; }
+.trend-rows { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .trend-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1000px) { .trend-rows { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.trend-row { display: flex; flex-direction: column; gap: 8px; min-height: 44px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); min-width: 0; transition: background .15s, border-color .15s; }
+.trend-row:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+.trend-row:active { transform: scale(.995); }
+.trend-row-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.trend-row-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 42%); gap: 14px; align-items: center; }
+.trend-row-val { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.trend-row-val .tile-value { font-size: 26px; }
+.trend-row-spark { min-width: 0; }
+.trend-row-delta { min-height: 22px; display: flex; align-items: center; }
+
+.trend-page { --trend-hue: var(--hue-steps); }
+.trend-filters { display: flex; flex-direction: column; gap: 10px; }
+@media (min-width: 640px) { .trend-filters { flex-direction: row; align-items: center; justify-content: space-between; } .trend-filters .seg { flex: 0 1 auto; } }
+.trend-stepper { max-width: 520px; width: 100%; }
+.trend-stepper .stepper-label:disabled { opacity: 1; cursor: default; }
+.trend-stepper .stepper-sub { color: var(--text-3); }
+.trend-stats { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 900px) { .trend-stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); } }
+.trend-stat { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); min-width: 0; }
+.trend-stat-label { font-size: 13px; color: var(--text-2); }
+.trend-stat-value { font: 600 26px/1.1 var(--font-display); letter-spacing: -.01em; white-space: nowrap; }
+.trend-stat-sub { font-size: 12.5px; color: var(--text-2); }
+.trend-stat .delta { flex-wrap: wrap; gap: 2px 6px; }
+
+.trend-strip { height: 8px; margin: 6px 8px 0 44px; border-radius: 2px; background: color-mix(in srgb, var(--grid) 60%, transparent); overflow: hidden; }
+.trend-strip rect { fill: var(--text-3); }
+.trend-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; padding-left: 44px; font-size: 12.5px; color: var(--text-2); }
+.trend-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.trend-key { width: 14px; height: 3px; border-radius: 2px; background: var(--trend-hue); display: inline-block; }
+.trend-key-dash { background: repeating-linear-gradient(90deg, var(--text-3) 0 4px, transparent 4px 7px); }
+.trend-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 10px; }
+.trend-foot:empty { display: none; }
+.trend-foot-hint { font-size: 12.5px; color: var(--text-3); }
+
+.trend-table summary { list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 0 16px; font: 600 14px var(--font-ui); cursor: pointer; }
+.trend-table summary::-webkit-details-marker { display: none; }
+.trend-table summary svg { color: var(--text-3); transition: transform .2s; }
+.trend-table[open] summary svg { transform: rotate(180deg); }
+.trend-table[open] summary { border-bottom: 1px solid var(--border); }
+.trend-na { color: var(--text-3); }
+.trend-related { display: flex; flex-wrap: wrap; gap: 10px; }
+.trend-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px 0 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); font: 600 14px var(--font-ui); }
+.trend-chip .tile-dot { background: var(--chip-hue); }
+.trend-chip svg { color: var(--text-3); }
+.trend-chip:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+@media (max-width: 899px) { .trend-stats > :last-child { grid-column: auto / -1; } }

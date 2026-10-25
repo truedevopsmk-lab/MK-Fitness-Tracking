@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict'
+import { typeGroup, fmtPace, paceOrSpeed, trainingEffect, loadBand, loadSeries, dailyLoadMap, weekKeys, activityContext } from '../src/lib/activities.js'
+
+assert.equal(typeGroup('trail_running'), 'run'); assert.equal(typeGroup('indoor_cycling'), 'ride')
+assert.equal(typeGroup('hiking'), 'walk'); assert.equal(typeGroup('strength_training'), 'strength'); assert.equal(typeGroup('yoga'), 'other')
+assert.equal(fmtPace(312), '5:12'); assert.equal(fmtPace(359.7), '6:00')
+assert.deepEqual(paceOrSpeed({ type: 'running', distanceM: 5000, durationSec: 1500, avgSpeed: 1000 / 300 }), { label: 'Pace', value: '5:00', unit: '/km' })
+assert.equal(paceOrSpeed({ type: 'cycling', distanceM: 20000, durationSec: 3600 }).unit, 'km/h')
+assert.equal(paceOrSpeed({ type: 'strength_training', distanceM: 0 }), null)
+assert.equal(trainingEffect(0.4), 'None'); assert.equal(trainingEffect(2.9), 'Maintaining'); assert.equal(trainingEffect(5), 'Overreaching')
+assert.equal(loadBand(0.7).label, 'Detraining'); assert.equal(loadBand(1).label, 'Productive range'); assert.equal(loadBand(1.4).label, 'High'); assert.equal(loadBand(1.6).label, 'Very high')
+const map = dailyLoadMap({ '2026-01-05': { training: { load: 50 } } }, [{ day: '2026-01-05', trainingLoad: 10 }, { day: '2026-01-06', trainingLoad: 20 }])
+assert.deepEqual(map, { '2026-01-05': 50, '2026-01-06': 20 })
+const s = loadSeries(map, '2026-01-06', '2026-01-06')
+assert.equal(s[0].acute, 70); assert.equal(s[0].chronic, 17.5); assert.equal(s[0].ratio, 4)
+assert.deepEqual(weekKeys('2026-01-07', '2026-01-20'), ['2026-01-05', '2026-01-12', '2026-01-19'])
+const acts = [1, 2, 3, 4].map(i => ({ id: 'a' + i, type: 'running', day: `2026-01-0${i}`, startTs: i, durationSec: 1800, distanceM: 5000 }))
+const c = activityContext({ id: 'x', type: 'running', day: '2026-01-05', startTs: 5, durationSec: 2400, distanceM: 6000 }, acts)
+assert.equal(c.nth, '5th'); assert.match(c.compare, /20% longer than your average run/)
+console.log('activities tests passed')

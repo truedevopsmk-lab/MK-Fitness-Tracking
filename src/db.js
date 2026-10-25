@@ -1,4 +1,0 @@
-const DB = 'garmin-personal-dashboard', VERSION = 1
-function open() { return new Promise((resolve, reject) => { const r = indexedDB.open(DB, VERSION); r.onupgradeneeded = () => r.result.createObjectStore('data'); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error) }) }
-export async function save(key, value) { const db = await open(); const r = db.transaction('data', 'readwrite').objectStore('data').put(value, key); return new Promise((res, rej) => { r.onsuccess = () => { db.close(); res() }; r.onerror = () => rej(r.error) }) }
-export async function load(key, fallback = null) { const db = await open(); const r = db.transaction('data').objectStore('data').get(key); return new Promise(res => { r.onsuccess = () => { db.close(); res(r.result ?? fallback) }; r.onerror = () => res(fallback) }) }

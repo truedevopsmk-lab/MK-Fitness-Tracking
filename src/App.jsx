@@ -1,73 +1,179 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { fetchActivities, fetchAllActivities, fetchBodyBattery, fetchDailyStepsRange, fetchDailyStressRange, fetchHrv, fetchSettings, fetchSleepDays, fetchWeight, isoDate, session, signOut, tokenFromApiKey } from './garmin'
-import { load, save } from './db'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
+import './styles/tokens.css'
+import './styles/base.css'
+import './styles/components.css'
+import { getState, useStore } from './state/store'
+import { getPrefs, setPrefs, usePrefs } from './lib/prefs'
+import { fmtAgo } from './lib/format'
+import { isSessionValid } from './sync/garmin'
+import { navigate, useRoute } from './router'
+import { useLockState } from './lib/lock'
+import ErrorBoundary from './components/ErrorBoundary'
+import Toaster from './components/Toaster'
+import Sheet from './components/Sheet'
+import Segmented from './components/Segmented'
+import PullToRefresh from './components/PullToRefresh'
+import LockScreen from './components/LockScreen'
+import Icon from './components/Icon'
+import PageHeader from './components/PageHeader'
+import Empty from './components/Empty'
+import Button from './components/Button'
+import { toast } from './components/toast'
+import Connect from './pages/Connect'
 
-const C = { mint: '#20c997', blue: '#60a5fa', yellow: '#facc15', pink: '#fb7185', text: '#eefbf8', dim: '#8ba3a1' }
-const dateOf = x => x?.startTimeLocal || x?.startTimeGMT || x?.startDate || x?.calendarDate || x?.date
-const typeOf = x => x?.activityType?.typeKey || x?.activityTypeKey || x?.activityName || 'activity'
-const km = x => Number(x?.distance || x?.totalDistance || 0) / 1000
-const secs = x => Number(x?.duration || x?.movingDuration || x?.elapsedDuration || 0)
-const fmtTime = s => !s ? '—' : `${Math.floor(s / 3600)}h ${String(Math.floor(s % 3600 / 60)).padStart(2, '0')}m`
-const fmtDate = d => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'
-const firstNumber = (value, keys) => { if (!value) return null; if (Array.isArray(value)) { for (const x of value) { const n = firstNumber(x, keys); if (n != null) return n } return null }; if (typeof value !== 'object') return null; for (const k of keys) if (typeof value[k] === 'number') return value[k]; for (const v of Object.values(value)) { const n = firstNumber(v, keys); if (n != null) return n }; return null }
-const latest = value => Array.isArray(value) ? value[value.length - 1] : value
-const sleepRows = value => {
-  if (Array.isArray(value)) return value
-  if (Array.isArray(value?.sleep)) return value.sleep
-  if (Array.isArray(value?.dailySleepSummaries)) return value.dailySleepSummaries
-  if (Array.isArray(value?.dailySleepDTOList)) return value.dailySleepDTOList
-  return value ? [value] : []
+const page = loader => lazy(loader)
+const Today = page(() => import('./pages/Today'))
+const Morning = page(() => import('./pages/Morning'))
+const Trends = page(() => import('./pages/Trends'))
+const TrendDetail = page(() => import('./pages/TrendDetail'))
+const Sleep = page(() => import('./pages/Sleep'))
+const Reports = page(() => import('./pages/Reports'))
+const Activities = page(() => import('./pages/Activities'))
+const ActivityDetail = page(() => import('./pages/ActivityDetail'))
+const Insights = page(() => import('./pages/Insights'))
+const SyncCenter = page(() => import('./pages/SyncCenter'))
+const Settings = page(() => import('./pages/Settings'))
+const REPORTS = {
+  stress: page(() => import('./pages/reports/Stress')), 'body-battery': page(() => import('./pages/reports/BodyBattery')),
+  hrv: page(() => import('./pages/reports/Hrv')), 'heart-rate': page(() => import('./pages/reports/HeartRate')),
+  steps: page(() => import('./pages/reports/Steps')), recovery: page(() => import('./pages/reports/Recovery')),
+  activities: page(() => import('./pages/reports/ActivitiesReport')), 'training-load': page(() => import('./pages/reports/TrainingLoad')),
 }
-const getSleepScore = value => firstNumber(value, ['sleepScore', 'overallSleepScore', 'score', 'value'])
-const latestHrv = value => value?.hrvSummaries?.at(-1) || latest(value)
-const latestBattery = value => { const record = latest(value); const samples = record?.bodyBatteryValuesArray; return samples?.at(-1)?.[1] ?? record?.bodyBatteryValue ?? null }
+const Kit = import.meta.env.DEV ? page(() => import('./pages/Kit')) : null
 
-function Card({ children, className = '', onClick }) { return <section className={`card ${className}`} onClick={onClick}>{children}</section> }
-function Metric({ icon, label, value, sub, color = C.mint, onClick }) { return <Card className="metric" onClick={onClick}><div className="metric-icon" style={{ color }}>{icon}</div><div className="label">{label}</div><div className="value" style={{ color }}>{value}</div><div className="sub">{sub}</div><div className="trend-hint">VIEW TREND →</div></Card> }
-function Header({ tab, setTab, syncing, syncPhase, onSync, onFullSync, onSignOut, theme, onTheme }) { const themeIcon = theme === 'day' ? '☀' : theme === 'color' ? '◈' : '☾'; return <header><div className="logo">MK <span>FITNESS</span></div><nav>{['home', 'activity', 'reports'].map(t => <button key={t} onClick={() => setTab(t)} className={tab === t ? 'active' : ''}>{t}</button>)}</nav><div className="header-actions"><button className="theme-toggle" title="Change theme" aria-label="Change theme" onClick={onTheme}>{themeIcon}</button><button className="sync" disabled={syncing} onClick={onSync}>{syncing ? `SYNCING · ${syncPhase}` : '↻ SYNC LATEST'}</button><button className="full-sync" disabled={syncing} onClick={onFullSync}>FULL SYNC</button><button className="signout" onClick={onSignOut}>SIGN OUT</button></div></header> }
-function Connect({ error, onConnect }) { const [key, setKey] = useState(''); const [busy, setBusy] = useState(false); async function submit(e) { e.preventDefault(); setBusy(true); try { await tokenFromApiKey(key); onConnect() } catch (x) { onConnect(x.message) } finally { setBusy(false) } }; return <main className="connect"><div className="brand">MK'S<br /><span>FITNESS DASHBOARD</span></div><p>Your private daily-readiness dashboard. The API key is used only to create a short-lived token and is never stored.</p><form onSubmit={submit}><label>Garmin Personal API Key<input type="password" value={key} onChange={e => setKey(e.target.value)} required placeholder="Paste your key here" /></label><button>{busy ? 'CONNECTING…' : 'CONNECT GARMIN'}</button></form>{error && <div className="error">{error}</div>}<small>Sleep, stress, Body Battery, HRV, activity and training trends.</small></main> }
+const NAV = [
+  { id: 'today', label: 'Today', icon: 'today', to: '#/', match: p => p === '/' || p === '/morning' },
+  { id: 'trends', label: 'Trends', icon: 'trends', to: '#/trends', match: p => p.startsWith('/trends') },
+  { id: 'sleep', label: 'Sleep', icon: 'sleep', to: '#/sleep', match: p => p.startsWith('/sleep') },
+  { id: 'reports', label: 'Reports', icon: 'reports', to: '#/reports', match: p => p.startsWith('/reports') },
+  { id: 'more', label: 'More', icon: 'more', to: null, match: p => ['/insights', '/activities', '/sync', '/settings'].some(x => p.startsWith(x)) },
+]
+const MORE = [
+  { label: 'Insights', icon: 'insights', to: '#/insights' }, { label: 'Activities', icon: 'activity', to: '#/activities' },
+  { label: 'Sync Center', icon: 'sync', to: '#/sync' }, { label: 'Settings', icon: 'settings', to: '#/settings' },
+]
+const THEMES = [{ value: 'night', label: 'Night' }, { value: 'day', label: 'Day' }, { value: 'color', label: 'Color' }, { value: 'auto', label: 'Auto' }]
+const THEME_ICON = { night: 'moon', day: 'sun', color: 'palette', auto: 'sun' }
+
+export function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme
+  const meta = document.querySelector('meta[name="theme-color"]:not([media])') || document.head.appendChild(Object.assign(document.createElement('meta'), { name: 'theme-color' }))
+  meta.content = getComputedStyle(document.documentElement).getPropertyValue('--meta-theme').trim()
+}
+
+const loadEngine = () => import('./sync/engine')
+const autoSync = () => loadEngine().then(e => e.maybeAutoSync()).catch(e => console.warn('auto sync', e))
+
+function Splash() { return <div className="splash"><div className="splash-logo">MK<span>FITNESS</span></div></div> }
+function NotFound() {
+  return <div className="page"><PageHeader title="Page not found" back="#/" /><Empty icon="more" title="That page doesn’t exist" body="The link may be out of date." action={<Button variant="primary" href="#/">Back to Today</Button>} /></div>
+}
+const Loading = () => <div className="page" aria-busy="true" />
+
+function SyncChip() {
+  const { running, mode } = useStore(s => s.sync)
+  const last = useStore(s => s.syncMeta.lastSuccessAt)
+  const [, tick] = useState(0)
+  useEffect(() => { const id = setInterval(() => tick(n => n + 1), 30000); return () => clearInterval(id) }, [])
+  const ago = last ? fmtAgo(last) : null
+  const text = running ? (mode === 'full' ? 'Full sync' : 'Syncing') : ago ? `Synced ${ago}` : 'Not synced'
+  return <a className={`sync-chip${!running && last && Date.now() - last > 24 * 3600e3 ? ' is-stale' : ''}`} href="#/sync" aria-label={`${text}. Open Sync Center`}>
+    {running ? <span className="spinner" aria-hidden="true" /> : <Icon name="sync" size={16} />}
+    <span className="sync-chip-text">{running || !ago ? text : <><span className="sync-pre">Synced </span>{ago.replace(/ ago$/, '')}{/ ago$/.test(ago) && <span className="sync-pre"> ago</span>}</>}</span>
+  </a>
+}
+
+function Header({ onTheme, route }) {
+  const source = useStore(s => s.source)
+  const prefs = usePrefs()
+  return <header className="app-header"><div className="app-header-in">
+    <a className="logo" href="#/" aria-label="MK Fitness, Today">MK<span>FITNESS</span></a>
+    <nav className="top-nav" aria-label="Main">{NAV.map(n => <NavItem key={n.id} n={n} on={n.match(route.path)} />)}</nav>
+    <div className="header-spacer" />
+    <span className={`chip ${source === 'demo' ? 'chip-demo' : ''}`}><i className="chip-dot" />{source === 'demo' ? 'Demo data' : 'Garmin'}</span>
+    <SyncChip />
+    <button type="button" className="icon-btn" onClick={onTheme} aria-label={`Theme: ${prefs.theme}. Change theme`}><Icon name={THEME_ICON[prefs.theme] || 'moon'} size={20} /></button>
+  </div></header>
+}
+
+function NavItem({ n, on }) {
+  const props = { className: `nav-item${on ? ' is-on' : ''}`, 'aria-current': on ? 'page' : undefined }
+  const inner = <><Icon name={n.icon} size={22} /><span>{n.label}</span></>
+  return n.to ? <a href={n.to} {...props}>{inner}</a> : <button type="button" {...props} onClick={() => window.dispatchEvent(new Event('mk:more'))}>{inner}</button>
+}
+
+function Routes({ route }) {
+  const { path, segments } = route
+  const [a, b] = segments
+  if (!a) return <Today />
+  if (a === 'morning') return <Morning />
+  if (a === 'trends') return b ? <TrendDetail key={b} metricKey={b} /> : <Trends />
+  if (a === 'sleep') return <Sleep />
+  if (a === 'reports') { const R = b && REPORTS[b]; return R ? <R /> : <Reports /> }
+  if (a === 'activities') return b ? <ActivityDetail key={b} id={b} /> : <Activities />
+  if (a === 'insights') return <Insights />
+  if (a === 'sync') return <SyncCenter />
+  if (a === 'settings') return <Settings />
+  if (a === '__kit' && Kit) return <Kit />
+  return <NotFound key={path} />
+}
 
 export default function App() {
-  const [connected, setConnected] = useState(!!session()), [tab, setTab] = useState('home'), [syncing, setSyncing] = useState(false), [syncPhase, setSyncPhase] = useState(''), [error, setError] = useState('')
-  const [activities, setActivities] = useState([]), [settings, setSettings] = useState(null), [wellness, setWellness] = useState({}), [lastSync, setLastSync] = useState(null), [detail, setDetail] = useState(null), [trendMetric, setTrendMetric] = useState(null), [trendWindow, setTrendWindow] = useState(30), [theme, setTheme] = useState(() => localStorage.getItem('mk_fitness_theme') || 'night')
-  const syncLock = useRef(false)
-  async function runSync(full = false) { if (syncLock.current) return; syncLock.current = true; setSyncing(true); setError(''); try { const now = new Date(), from = new Date(now); if (full) from.setDate(now.getDate() - 364); else { const previous = lastSync ? new Date(lastSync) : new Date(now); from.setTime(previous.getTime()); from.setHours(from.getHours() - 24) } const start = isoDate(from), end = isoDate(now), safe = request => request.catch(() => null); setSyncPhase(full ? 'history' : 'latest'); const cached = full ? [] : await load('activities', []); const [incoming, prefs] = await Promise.all([full ? fetchAllActivities() : fetchActivities(100, 0), fetchSettings()]); const activityMap = new Map([...cached, ...incoming].map(item => [item.activityId || item.activityIdString || `${dateOf(item)}-${item.activityName}`, item])); const acts = [...activityMap.values()].sort((a, b) => new Date(dateOf(b)) - new Date(dateOf(a))); setSyncPhase('wellness'); const [steps, stress, bodyBattery, sleep, hrv, weight] = await Promise.all([safe(fetchDailyStepsRange(start, end)), safe(fetchDailyStressRange(start, end)), safe(fetchBodyBattery(start, end)), safe(fetchSleepDays(start, end)), safe(fetchHrv(start, end)), safe(fetchWeight(start, end))]); const w = { steps, stress, bodyBattery, sleep, hrv, weight }; setSyncPhase('saving'); setActivities(acts); setSettings(prefs); setWellness(w); const completed = new Date(); setLastSync(completed); await Promise.all([save('activities', acts), save('settings', prefs), save('wellness', w), save('lastSync', completed)]) } catch (e) { setError(e.message) } finally { syncLock.current = false; setSyncPhase(''); setSyncing(false) } }
-  const sync = () => runSync(false)
-  useEffect(() => { if (connected) (async () => { setActivities(await load('activities', [])); setSettings(await load('settings')); setWellness(await load('wellness', {})); setLastSync(await load('lastSync')) })() }, [connected])
-  const recent = useMemo(() => activities.slice(0, 8), [activities])
-  const runs = useMemo(() => activities.filter(a => /run|trail_running|treadmill/i.test(typeOf(a))), [activities])
-  const volume = useMemo(() => { const m = {}; runs.forEach(a => { const d = dateOf(a); if (d) m[String(d).slice(0, 7)] = (m[String(d).slice(0, 7)] || 0) + km(a) }); return Object.entries(m).sort().slice(-12).map(([month, distance]) => ({ month, distance: +distance.toFixed(1) })) }, [runs])
-  const bodyBattery = latestBattery(wellness.bodyBattery)
-  const sleepScore = getSleepScore(latest(sleepRows(wellness.sleep)))
-  const stress = firstNumber(latest(wellness.stress), ['overallStressLevel', 'averageStressLevel', 'avgStress', 'stressLevel', 'value'])
-  const hrv = firstNumber(latestHrv(wellness.hrv), ['lastNightAvg', 'weeklyAvg', 'hrvValue', 'value'])
-  const steps = firstNumber(latest(wellness.steps), ['totalSteps', 'steps', 'value'])
-  const trendData = useMemo(() => { if (!trendMetric) return []; const source = trendMetric === 'steps' ? wellness.steps : trendMetric === 'stress' ? wellness.stress : trendMetric === 'bodyBattery' ? wellness.bodyBattery : trendMetric === 'hrv' ? wellness.hrv?.hrvSummaries : sleepRows(wellness.sleep); const rows = Array.isArray(source) ? source : []; return rows.map(row => { const date = row.calendarDate || row.date || row.startTimeLocal?.slice(0, 10); let value = null; if (trendMetric === 'steps') value = row.totalSteps; if (trendMetric === 'stress') value = row.values?.overallStressLevel; if (trendMetric === 'bodyBattery') value = row.bodyBatteryValuesArray?.at(-1)?.[1]; if (trendMetric === 'hrv') value = row.lastNightAvg; if (trendMetric === 'sleep') value = getSleepScore(row); return date && value != null ? { date: date.slice(5), value } : null }).filter(Boolean).slice(-trendWindow) }, [trendMetric, trendWindow, wellness])
-  const trendLabels = { sleep: 'Sleep score', bodyBattery: 'Body Battery', stress: 'Stress', hrv: 'HRV', steps: 'Steps' }
-  const signOutNow = () => { signOut(); setConnected(false); setActivities([]) }
-  const cycleTheme = () => setTheme(current => { const next = current === 'night' ? 'day' : current === 'day' ? 'color' : 'night'; localStorage.setItem('mk_fitness_theme', next); return next })
-  if (!connected) return <Connect error={error} onConnect={e => e ? setError(e) : (setConnected(true), setError(''))} />
+  const route = useRoute()
+  const ready = useStore(s => s.ready)
+  const source = useStore(s => s.source)
+  const hasData = useStore(s => Object.keys(s.days).length > 0 || s.activities.length > 0)
+  const prefs = usePrefs()
+  const lock = useLockState()
+  const [more, setMore] = useState(false)
+  const [valid, setValid] = useState(isSessionValid)
 
-  return <div className={`app theme-${theme}`}>
-    <Header tab={tab} setTab={setTab} syncing={syncing} syncPhase={syncPhase} onSync={sync} onFullSync={() => runSync(true)} onSignOut={signOutNow} theme={theme} onTheme={cycleTheme} />
-    <main className="content">
-      {error && <div className="error banner">{error}</div>}
-      {syncing && <div className="sync-banner"><span className="spinner" /> Sync in progress: {syncPhase} · please keep this tab open</div>}
-      <div className="hero"><div><div className="eyebrow">{settings?.timeZone || 'PERSONAL CONNECT API'}</div><h1>GOOD MORNING,<br /><span>HOW ARE YOU TODAY?</span></h1></div><div className="date">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}<small>{lastSync ? `Last successful sync: ${new Date(lastSync).toLocaleString('en-IN')}` : 'No successful sync yet'}</small></div></div>
-      {tab === 'home' && <>
-        <div className="grid metrics">
-          <Metric onClick={() => setTrendMetric('sleep')} icon="☾" label="Sleep score" value={sleepScore ?? '—'} sub={sleepScore == null ? 'Sync sleep data' : 'last sleep record'} color={C.blue} />
-          <Metric onClick={() => setTrendMetric('bodyBattery')} icon="◌" label="Body Battery" value={bodyBattery ?? '—'} sub={bodyBattery == null ? 'Sync wellness data' : bodyBattery >= 70 ? 'good reserve' : bodyBattery >= 40 ? 'moderate reserve' : 'recovery needed'} color={C.mint} />
-          <Metric onClick={() => setTrendMetric('stress')} icon="⌁" label="Stress" value={stress ?? '—'} sub={stress == null ? 'Sync stress data' : stress <= 25 ? 'low average' : 'watch today'} color={C.yellow} />
-          <Metric onClick={() => setTrendMetric('hrv')} icon="♥" label="HRV" value={hrv ?? '—'} sub={hrv == null ? 'Sync HRV data' : 'recent baseline signal'} color={C.pink} />
-        </div>
-        {trendMetric && <Card className="trend-card"><div className="section-head"><div><h2>{trendLabels[trendMetric].toUpperCase()} TREND</h2><p>Tap a time window to change the analysis period.</p></div><button className="close-inline" onClick={() => setTrendMetric(null)}>×</button></div><div className="range-buttons">{[7, 30, 60, 120, 365].map(n => <button className={trendWindow === n ? 'selected' : ''} onClick={() => setTrendWindow(n)} key={n}>{n}D</button>)}</div><div className="trend-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={trendData}><CartesianGrid stroke="#ffffff0d" vertical={false} /><XAxis dataKey="date" tick={{ fill: C.dim, fontSize: 10 }} /><YAxis tick={{ fill: C.dim, fontSize: 10 }} /><Tooltip contentStyle={{ background: '#0c1c20', border: '1px solid #20c99755' }} /><Area type="monotone" dataKey="value" name={trendLabels[trendMetric]} stroke={C.mint} fill="#20c99722" strokeWidth={2} /></AreaChart></ResponsiveContainer></div></Card>}
-        <div className="grid home-grid"><Card><div className="section-head"><div><h2>TODAY AT A GLANCE</h2><p>Your quick check before deciding how hard to train.</p></div></div><div className="readiness"><div className="readiness-ring"><strong>{bodyBattery ?? '—'}</strong><span>RESERVE</span></div><div><h3>{bodyBattery >= 70 ? 'Ready for a strong day' : bodyBattery >= 40 ? 'Keep it steady' : bodyBattery != null ? 'Prioritize recovery' : 'Sync to calculate'}</h3><p className="muted">{sleepScore != null ? `Sleep score ${sleepScore}` : 'Sleep score unavailable'} · {stress != null ? `Stress ${stress}` : 'Stress unavailable'} · {steps != null ? `${Number(steps).toLocaleString()} steps` : 'Steps unavailable'}</p><div className="tip">This is a trend aid, not medical advice. Use your own symptoms and Garmin’s recovery guidance too.</div></div></div></Card><Card><div className="section-head"><div><h2>RECENT ACTIVITY</h2><p>Latest synced sessions</p></div><button className="link" onClick={() => setTab('activity')}>VIEW ALL →</button></div><div className="activity-list">{recent.length ? recent.map((a, i) => <button className="activity" key={a.activityId || i} onClick={() => setDetail(a)}><span className="activity-dot">{/run/i.test(typeOf(a)) ? '🏃' : /cycle|bike/i.test(typeOf(a)) ? '🚴' : '◉'}</span><span><strong>{a.activityName || typeOf(a)}</strong><small>{fmtDate(dateOf(a))} · {km(a).toFixed(1)} km</small></span><b>{fmtTime(secs(a))}</b></button>) : <p className="muted">No activities yet. Press Sync to pull Garmin Connect data.</p>}</div></Card></div>
-      </>}
-      {tab === 'activity' && <Card><div className="section-head"><div><h2>ACTIVITY TIMELINE</h2><p>All activities currently cached in this PWA</p></div></div><div className="activity-list">{activities.slice(0, 100).map((a, i) => <button className="activity" key={a.activityId || i} onClick={() => setDetail(a)}><span className="activity-dot">{/run/i.test(typeOf(a)) ? '🏃' : /cycle|bike/i.test(typeOf(a)) ? '🚴' : '◉'}</span><span><strong>{a.activityName || typeOf(a)}</strong><small>{fmtDate(dateOf(a))} · {km(a).toFixed(1)} km</small></span><b>{fmtTime(secs(a))}</b></button>)}</div></Card>}
-      {tab === 'reports' && <><Card><div className="section-head"><div><h2>RUNNING VOLUME</h2><p>Monthly distance from synced activities</p></div></div><div className="chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={volume}><CartesianGrid stroke="#ffffff0d" vertical={false} /><XAxis dataKey="month" tick={{ fill: C.dim, fontSize: 11 }} /><YAxis tick={{ fill: C.dim, fontSize: 11 }} /><Tooltip contentStyle={{ background: '#0c1c20', border: '1px solid #20c99755' }} /><Area type="monotone" dataKey="distance" name="km" stroke={C.mint} fill="#20c99722" strokeWidth={2} /></AreaChart></ResponsiveContainer></div></Card><div className="grid report-grid"><Card><h2>TRAINING SNAPSHOT</h2><div className="report-row"><span>Total activities</span><strong>{activities.length}</strong></div><div className="report-row"><span>Running distance</span><strong>{runs.reduce((s, a) => s + km(a), 0).toFixed(1)} km</strong></div><div className="report-row"><span>Total activity time</span><strong>{fmtTime(activities.reduce((s, a) => s + secs(a), 0))}</strong></div></Card><Card><h2>WELLNESS DATA</h2><pre className="json">{JSON.stringify({ steps: wellness.steps, stress: wellness.stress, bodyBattery: wellness.bodyBattery, sleep: wellness.sleep, hrv: wellness.hrv }, null, 2)}</pre></Card></div></>}
-      {detail && <div className="modal" onClick={() => setDetail(null)}><div className="modal-card" onClick={e => e.stopPropagation()}><button className="close" onClick={() => setDetail(null)}>×</button><h2>{detail.activityName || typeOf(detail)}</h2><p className="muted">{fmtDate(dateOf(detail))} · {km(detail).toFixed(1)} km · {fmtTime(secs(detail))}</p><pre className="json">{JSON.stringify(detail, null, 2)}</pre></div></div>}
-    </main>
+  useEffect(() => { applyTheme(prefs.theme) }, [prefs.theme])
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: light)'), on = () => getPrefs().theme === 'auto' && applyTheme('auto')
+    mq.addEventListener('change', on); return () => mq.removeEventListener('change', on)
+  }, [])
+  useEffect(() => {
+    const open = () => setMore(true)
+    window.addEventListener('mk:more', open)
+    const check = () => setValid(isSessionValid())
+    const vis = () => { if (document.visibilityState === 'visible') { check(); autoSync() } }
+    document.addEventListener('visibilitychange', vis)
+    const id = setInterval(check, 60000)
+    autoSync()
+    return () => { window.removeEventListener('mk:more', open); document.removeEventListener('visibilitychange', vis); clearInterval(id) }
+  }, [])
+  useEffect(() => { if (route.path === '/reports/sleep') navigate('#/sleep', { replace: true }) }, [route.path])
+  useEffect(() => { setMore(false) }, [route.path])
+  useEffect(() => { if (route.path === '/' && prefs.startPage === 'morning' && !sessionStorage.getItem('mk_start_done')) { sessionStorage.setItem('mk_start_done', '1'); navigate('#/morning', { replace: true }) } }, [])
+
+  const refresh = useCallback(async () => {
+    if (getState().source === 'demo') { toast('Demo data does not sync', { tone: 'neutral' }); return }
+    if (!isSessionValid()) { toast('Reconnect Garmin to sync', { tone: 'warning' }); navigate('#/sync'); return }
+    const e = await loadEngine()
+    await e.startSync('incremental')
+  }, [])
+
+  if (!ready) return <Splash />
+  if (!valid && !hasData && source !== 'demo') return <><Connect onConnected={() => setValid(true)} /><Toaster /></>
+  if (lock.locked) return <LockScreen onUnlock={lock.unlock} />
+
+  const reportsSleep = route.path === '/reports/sleep'
+  return <div className="app">
+    <Header route={route} onTheme={() => setPrefs({ theme: THEMES[(THEMES.findIndex(t => t.value === prefs.theme) + 1) % THEMES.length].value })} />
+    <PullToRefresh onRefresh={refresh}>
+      <main className="main" id="main">
+        {!valid && source !== 'demo' && <div className="banner" style={{ marginBottom: 14 }} role="status"><Icon name="alert" size={18} /><span>Garmin session expired. Reconnect to sync.</span><a href="#/sync">Reconnect</a></div>}
+        <ErrorBoundary resetKey={route.path}>
+          <Suspense fallback={<Loading />}><div className="page-fade" key={route.segments[0] || 'home'}>{reportsSleep ? null : <Routes route={route} />}</div></Suspense>
+        </ErrorBoundary>
+      </main>
+    </PullToRefresh>
+    <nav className="bottom-nav" aria-label="Main">{NAV.map(n => <NavItem key={n.id} n={n} on={n.match(route.path)} />)}</nav>
+    <Sheet open={more} onClose={() => setMore(false)} title="More">
+      <div className="more-list">{MORE.map(m => <a key={m.label} className="more-item" href={m.to}><span className="more-ico"><Icon name={m.icon} size={20} /></span>{m.label}<Icon name="chevron-right" size={18} className="more-chev" /></a>)}</div>
+      <div className="theme-opts"><span className="field-label">Theme</span><Segmented value={prefs.theme} onChange={theme => setPrefs({ theme })} options={THEMES} label="Theme" /></div>
+    </Sheet>
+    <Toaster />
   </div>
 }
