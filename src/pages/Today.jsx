@@ -6,6 +6,7 @@ import { fmtDay, fmtDuration, fmtNumber } from '../lib/format'
 import { METRICS, hrvStatusBand, isMeaningfulDelta } from '../lib/metrics'
 import { computeInsights } from '../lib/insights'
 import { latestValue, lastNDays } from '../data/select'
+import { useDisplayName, withName } from '../lib/name'
 import { bodyBatteryNow, deltaVs7, greetingFor, headlineFor, intensityWeek, latestActivity, recoveryFor, weekGrid, whenLabel } from '../lib/homeLogic'
 import { Badge, Button, Card, Empty, Icon, InstallHint, Meter, PageHeader, Ring, SectionTitle, StatTile, toast } from '../components'
 
@@ -79,11 +80,11 @@ export default function Today() {
   const insights = useMemo(() => { try { return computeInsights(days, activities, { asOf }).slice(0, 2) } catch { return [] } }, [days, activities, asOf])
   const wk = useMemo(() => intensityWeek(days, asOf), [days, asOf])
   const act = useMemo(() => latestActivity(activities), [activities])
-  const name = profile?.displayName || 'MK'
+  const name = useDisplayName()
   const newest = lastDay(days, asOf)
   const behind = newest ? daysBetween(newest, asOf) : null
 
-  const head = <PageHeader title={`${greetingFor()}, ${name}`} subtitle={new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })} />
+  const head = <PageHeader title={withName(greetingFor(), name)} subtitle={new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })} />
   if (!has) return <div className="page home"><div className="home-greet">{head}</div><InstallHint />
     <Card><Empty icon="sync" title="Welcome. Let’s bring in your data" body={source === 'demo' ? 'This demo has no data loaded.' : 'Sync with Garmin to fill in your sleep, Body Battery, HRV and activity. The first sync can take a few minutes.'} action={<Button variant="primary" href="#/sync" icon="sync">Open Sync Center</Button>} /></Card></div>
 
@@ -119,7 +120,7 @@ export default function Today() {
     <div className="home-tiles">
       <Tile days={days} asOf={asOf} metricKey="sleepScore" overnight href="#/sleep" sub={l => fmtDuration(l.record.sleep?.durationSec)} spark={undefined} />
       <StatTile metricKey="bodyBatteryHigh" label={bbLast?.ageDays ? 'Body Battery' : 'Battery now'} href={trend('bodyBatteryHigh')} value={bbLast ? bodyBatteryNow(bbLast.record) : null}
-        sub={bbRec ? [bbRec.start != null && `Woke at ${bbRec.start}`, bbRec.charged != null && `+${bbRec.charged} charged`, bbRec.drained != null && `−${bbRec.drained} drained`, bbLast.ageDays > 0 && whenLabel(bbLast.date, asOf)].filter(Boolean).join(' · ') : 'No data yet'}
+        sub={bbRec ? [bbRec.high != null && `Peak ${bbRec.high}`, bbRec.charged != null && `+${bbRec.charged} charged`, bbRec.drained != null && `−${bbRec.drained} drained`, bbLast.ageDays > 0 && whenLabel(bbLast.date, asOf)].filter(Boolean).join(' · ') : 'No data yet'}
         spark={lastNDays(days, 'bodyBatteryHigh', 14, asOf)} />
       <Tile days={days} asOf={asOf} metricKey="stressAvg" label="Stress" sub={l => l.record.stress?.highSec ? `High stress ${fmtDuration(l.record.stress.highSec)}` : null} />
       <StatTile metricKey="hrv" href={trend('hrv')} value={hrvLast?.value ?? null} band={hrvStatus || false}

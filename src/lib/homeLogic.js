@@ -36,13 +36,19 @@ export function recoveryFor(days, asOf) {
   const readiness = latestValue(days, 'readiness', { asOf, lookbackDays: 1 })
   const comps = [], parts = []
   if (sleep) {
-    comps.push([.4, sleep.value])
+    // score blended with duration vs need, so a short night can't hide behind a decent score
+    const dur = sleep.record.sleep?.durationSec, need = sleep.record.sleep?.needSec || 8 * 3600
+    const durPts = dur ? clamp(100 * dur / need, 0, 100) : null
+    comps.push([.4, durPts == null ? sleep.value : .6 * sleep.value + .4 * durPts])
     const b = METRICS.sleepScore.band(sleep.value)
     parts.push({ key: 'sleep', text: `Sleep ${Math.round(sleep.value)} · ${b.label.toLowerCase()}`, tone: b.tone })
+    if (dur && dur < need - 3600) parts.push({ key: 'short', text: `Short night · ${Math.floor(dur / 3600)}h ${String(Math.round(dur % 3600 / 60)).padStart(2, '0')}m`, tone: 'warning' })
   }
   const hr = hrvRatio(days, hrv)
   if (hr) {
-    comps.push([.35, clamp(70 + (hr.ratio - 1) * 250, 0, 100)])
+    // HRV near its own baseline is good; well below is a recovery signal. Above baseline is not
+    // "extra" recovery, so it plateaus instead of pushing the score towards 100.
+    comps.push([.35, hr.ratio >= 1 ? clamp(85 - (hr.ratio - 1.15) * 60 * (hr.ratio > 1.15), 70, 85) : clamp(85 - (1 - hr.ratio) * 300, 0, 85)])
     const st = hrvStatusBand(days[hrv.date]?.hrv?.status)
     const text = st ? `HRV ${st.label.toLowerCase()}` : hr.ratio >= .95 ? 'HRV in range' : hr.ratio >= .85 ? 'HRV a bit low' : 'HRV below range'
     parts.push({ key: 'hrv', text, tone: st ? st.tone : hr.ratio >= .95 ? 'good' : hr.ratio >= .85 ? 'warning' : 'serious' })
@@ -50,12 +56,15 @@ export function recoveryFor(days, asOf) {
   if (bb) {
     comps.push([.25, bb.value])
     const b = METRICS.bodyBatteryHigh.band(bb.value)
-    parts.push({ key: 'bb', text: `Body Battery peaked at ${Math.round(bb.value)}`, tone: b.tone })
+    parts.push({ key: 'bb', text: `Body Battery high ${Math.round(bb.value)}`, tone: b.tone })
   }
   if (readiness) return { score: Math.round(readiness.value), kind: 'garmin', date: readiness.date, parts }
   if (comps.length < 2) return { score: null, kind: null, date: null, parts }
   const w = comps.reduce((a, [x]) => a + x, 0)
-  const score = Math.round(comps.reduce((a, [x, s]) => a + x * s, 0) / w)
+  let score = Math.round(comps.reduce((a, [x, s]) => a + x * s, 0) / w)
+  // A short night caps readiness however full Body Battery looks (Garmin's readiness behaves the same way)
+  const dur = sleep?.record.sleep?.durationSec, need = sleep?.record.sleep?.needSec || 8 * 3600
+  if (dur) score = Math.min(score, need - dur > 2.5 * 3600 ? 55 : need - dur > 3600 ? 70 : 100)
   return { score, kind: 'estimate', date: (sleep || hrv || bb).date, parts }
 }
 

@@ -13,6 +13,7 @@ export const DEFAULT_PREFS = {
   lockMethod: null,        // 'biometric' | 'pin'
   lockAfterMin: 5,
   installDismissed: false,
+  displayName: '',         // optional local override for the greeting; never synced or exported
 }
 
 let cache = null

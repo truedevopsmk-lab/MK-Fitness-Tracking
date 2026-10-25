@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { actions, getState, useStore } from '../state/store'
 import { setPrefs, usePrefs } from '../lib/prefs'
+import { resolveName } from '../lib/name'
 import { fmtAgo, fmtDay, fmtNumber } from '../lib/format'
 import { today } from '../lib/dates'
 import { downloadFile } from '../lib/csv'
@@ -30,6 +31,15 @@ const PERDAY = [{ value: 30, label: '30 days' }, { value: 60, label: '60 days' }
 const AFTER = [{ value: 1, label: '1 min' }, { value: 5, label: '5 min' }, { value: 15, label: '15 min' }]
 
 const bytes = n => n == null ? '—' : n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`
+
+function NameField({ value, placeholder }) {
+  const [draft, setDraft] = useState(value || '')
+  useEffect(() => setDraft(value || ''), [value])
+  const commit = () => { const v = draft.trim().slice(0, 40); if (v !== (value || '')) { setPrefs({ displayName: v }); toast(v ? `Hello, ${v}` : 'Name cleared') } }
+  return <input className="input" type="text" value={draft} maxLength={40} autoComplete="given-name" enterKeyHint="done"
+    placeholder={placeholder} aria-label="Your name" onChange={e => setDraft(e.target.value)} onBlur={commit}
+    onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+}
 
 function Row({ title, hint, children, stack }) {
   return <div className={`set-row${stack ? ' is-stack' : ''}`}>
@@ -61,6 +71,8 @@ function PinSheet({ open, onClose, onDone }) {
 
 export default function Settings() {
   const prefs = usePrefs()
+  const profile = useStore(s => s.profile)
+  const garminName = resolveName('', profile)
   const source = useStore(s => s.source), syncMeta = useStore(s => s.syncMeta)
   const days = useStore(s => s.days), activities = useStore(s => s.activities)
   const [usage, setUsage] = useState(null)
@@ -121,6 +133,15 @@ export default function Settings() {
 
   return <div className="page page-fade settings-page">
     <PageHeader title="Settings" subtitle="Data, appearance, privacy and backups" />
+
+    <section className="set-sec">
+      <SectionTitle>Profile</SectionTitle>
+      <Card>
+        <Row title="Your name" hint={`Used in the greeting. Stays on this device.${!prefs.displayName && garminName ? ` Garmin's name: ${garminName}.` : ''}`} stack>
+          <NameField value={prefs.displayName} placeholder={garminName || 'e.g. Asha'} />
+        </Row>
+      </Card>
+    </section>
 
     <section className="set-sec" aria-labelledby="s-source">
       <SectionTitle>Data source</SectionTitle>

@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useDisplayName, withName } from '../lib/name'
 import '../styles/home.css'
 import { useStore } from '../state/store'
 import { today } from '../lib/dates'
@@ -13,6 +14,7 @@ const hueStyle = h => ({ '--m-hue': `var(--hue-${h})` })
 export default function Morning() {
   const days = useStore(s => s.days)
   const profile = useStore(s => s.profile)
+  const name = useDisplayName()
   const asOf = today()
   const rec = useMemo(() => recoveryFor(days, asOf), [days, asOf])
   if (!Object.keys(days).length) return <div className="page morning"><Card><Empty icon="sync" title="No data yet" body="Sync with Garmin to see your morning check." action={<Button variant="primary" href="#/sync" icon="sync">Open Sync Center</Button>} /></Card></div>
@@ -29,7 +31,7 @@ export default function Morning() {
   const bbBand = bbNow != null ? METRICS.bodyBatteryHigh.band(bbNow) : null
 
   return <div className="page morning">
-    <h1 className="page-title morning-title">{greetingFor()}, {profile?.displayName || 'MK'}</h1>
+    <h1 className="page-title morning-title">{withName(greetingFor(), name)}</h1>
     <Card className="morning-card" href="#/sleep" style={hueStyle('sleep')}>
       <span className="morning-label"><i className="tile-dot" aria-hidden="true" />Sleep · {sleep ? whenLabel(sleep.date, asOf, true) : 'no data'}</span>
       <div className="morning-row">

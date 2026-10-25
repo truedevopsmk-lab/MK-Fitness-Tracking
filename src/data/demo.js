@@ -118,7 +118,7 @@ export function generateDemo(seed = 20260101) {
     prevSleepH = sleepH
     days.push(rec)
   })
-  return { days, activities, profile: { displayName: 'MK', fullName: 'MK', timeZone: 'Asia/Kolkata', stepGoal: 10000, sleepNeedSec: 7.5 * 3600 } }
+  return { days, activities, profile: { displayName: 'e0399703-3ad1-4a14-97d1-d21fc75573cf', fullName: null, timeZone: 'Asia/Kolkata', stepGoal: 10000, sleepNeedSec: 7.5 * 3600 } }
 }
 
 // Plausible hypnogram: light → deep early, REM later, brief awakenings; segment lengths are rescaled to match the night's totals.
