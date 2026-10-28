@@ -50,3 +50,18 @@
 @media (min-width: 640px) { .sl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 900px) { .sl-trends-head { flex-direction: row; align-items: center; justify-content: space-between; } .sl-trends-head .seg { width: 380px; } }
 .sl-grid > :last-child { grid-column: auto / -1; }
+.sl-factor-sum { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 14px; font-size: 14.5px; line-height: 1.45; color: var(--text); }
+.sl-factor-sum svg { flex: none; margin-top: 2px; }
+.sl-factor-sum.is-good svg { color: var(--good); }
+.sl-factor-sum.is-warning svg { color: var(--warning); }
+.sl-factors { display: grid; gap: 18px; }
+@media (min-width: 900px) { .sl-factors { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; } }
+.sl-factor-rows { list-style: none; margin: 0; padding: 0; }
+.sl-factor-rows li { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; min-height: 52px; padding: 8px 0; border-top: 1px solid var(--border); }
+.sl-factor-rows li:first-child { border-top: 0; }
+.sl-factor-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sl-factor-name { font-size: 15px; display: inline-flex; align-items: center; gap: 8px; }
+.sl-factor-name i { width: 12px; height: 12px; border-radius: 4px; flex: none; }
+.sl-factor-detail { font-size: 13px; color: var(--text-2); line-height: 1.35; }
+.sl-tally { display: grid; gap: 14px; margin-bottom: 2px; }
+@media (min-width: 900px) { .sl-tally { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; } }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bar, BarChart, Cell, CartesianGrid, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts'
-import { Badge, Button, Card, DataTable, DateStepper, Empty, Icon, KeyValue, MissingNote, PageHeader, RangeTabs, Ring, SectionTitle, StatTile } from '../components'
+import { Badge, Button, Card, DataTable, DateStepper, Empty, Icon, KeyValue, Meter, MissingNote, PageHeader, RangeTabs, Ring, SectionTitle, StatTile } from '../components'
 import { toast } from '../components/toast'
 import TrendChart from '../charts/TrendChart'
 import { Legend, TipCard, refLabel } from '../charts/ChartParts'
@@ -14,7 +14,7 @@ import { METRICS, SLEEP_STAGES } from '../lib/metrics'
 import { rollingBaseline, summarize } from '../lib/stats'
 import { dataBounds, latestValue } from '../data/select'
 import { toCsv, downloadFile } from '../lib/csv'
-import { averages, buildRows, clockFromNorm, consistency, needSecFor, recoveryPairs, sleepDebt, stageBreakdown, stageSummary, timeInBedSec } from './sleepLogic'
+import { averages, buildRows, clockFromNorm, consistency, needSecFor, recoveryPairs, sleepDebt, stageBreakdown, stageSummary, subScoreRows, subScoreSummary, subScoreTally, timeInBedSec } from './sleepLogic'
 import '../styles/sleep.css'
 
 const num = v => typeof v === 'number' && Number.isFinite(v)
@@ -91,6 +91,29 @@ function StageBreakdown({ sleep }) {
       </li>)}
     </ul>
   </div>
+}
+
+/* ---------- Garmin sub-scores ---------- */
+function ScoreFactors({ sleep }) {
+  const rows = subScoreRows(sleep)
+  if (!rows) return null
+  const sum = subScoreSummary(rows)
+  return <Card title="What shaped your score" subtitle="Garmin’s rating of each part of the night">
+    <p className={`sl-factor-sum is-${sum.tone}`}><Icon name={sum.tone === 'good' ? 'check' : 'alert'} size={16} />{sum.text}</p>
+    <div className="sl-factors">
+      {[['night', 'The night'], ['stages', 'Stage mix']].map(([g, title]) => { const list = rows.filter(r => r.group === g); return list.length ? <div key={g}>
+        <h3 className="sl-sub">{title}</h3>
+        <ul className="sl-factor-rows">{list.map(r => <li key={r.key}>
+          <div className="sl-factor-text">
+            <span className="sl-factor-name">{r.group === 'stages' && <i style={{ background: STAGE[r.key].color }} aria-hidden="true" />}{r.label}</span>
+            {r.detail && <span className="sl-factor-detail">{r.detail}</span>}
+          </div>
+          <Badge tone={r.tone}>{r.qualLabel}</Badge>
+        </li>)}</ul>
+      </div> : null })}
+    </div>
+    <p className="sl-foot">Ratings and optimal ranges come from Garmin. Stage shares here are of time asleep, so they can differ slightly from Sleep stages below, which also counts time awake.</p>
+  </Card>
 }
 
 /* ---------- Shared chart bits ---------- */
@@ -234,6 +257,7 @@ export default function Sleep() {
   const cons = useMemo(() => consistency(rows), [rows])
   const rec7 = useMemo(() => recoveryPairs(rows), [rows])
   const avg = useMemo(() => averages(rows), [rows])
+  const tally = useMemo(() => subScoreTally(days, rows.map(r => r.date)), [days, rows])
   const scoreSeries = useMemo(() => rollingBaseline(rows.map(r => ({ date: r.date, value: r.score })), 7), [rows])
   const scoreSummary = useMemo(() => summarize(rows.map(r => ({ value: r.score })), prevRows.map(r => ({ value: r.score }))), [rows, prevRows])
   const needNow = needSecFor(days[end]?.sleep, prefs.sleepNeedHours)
@@ -294,6 +318,8 @@ export default function Sleep() {
         </dl>
       </Card>
 
+      <ScoreFactors sleep={sleep} />
+
       <Card title="Sleep stages" subtitle="Share of the night in each stage">
         <StageBreakdown sleep={sleep} />
         {sleep.stages?.length ? <div className="sl-hyp-wrap">
@@ -331,6 +357,12 @@ export default function Sleep() {
       <Card title="Sleep score" subtitle="Dashed line is the 7-night average">
         <TrendChart data={scoreSeries} metricKey="sleepScore" kind="line" ariaLabel="Sleep score per night" />
       </Card>
+
+      {tally.nights >= 7 && <Card title="What holds your score back" subtitle={`Nights each part rated fair or poor · ${tally.nights} nights`}>
+        <p className="sl-insight">{tally.text}</p>
+        <div className="sl-tally">{tally.items.map(i => <Meter key={i.key} value={i.low} max={i.rated} hue="sleep" label={i.label} valueLabel={`${i.low} of ${i.rated}`} />)}</div>
+        <p className="sl-foot">Ratings come from Garmin. A part that is often fair or poor is where your sleep score has the most room to grow.</p>
+      </Card>}
 
       <Card title="Sleep duration" subtitle="Time asleep per night, by stage">
         <DurationChart rows={rows} needSec={needNow} />

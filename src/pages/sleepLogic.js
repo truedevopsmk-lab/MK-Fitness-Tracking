@@ -1,5 +1,6 @@
 // Pure sleep calculations (no React) so they can be unit-tested in Node.
 import { eachDay } from '../lib/dates.js'
+import { fmtDuration } from '../lib/format.js'
 import { mean, stdev, correlation } from '../lib/stats.js'
 
 const ANCHOR_MIN = 18 * 60 // clock times are measured from 18:00 so 23:30 and 01:15 sit on one continuous axis
@@ -97,4 +98,85 @@ export function stageSummary(stages) {
   const t0 = stages[0].start, awake = stages.filter(s => s.stage === 'awake' && s.end - s.start >= 60000)
   const firstDeep = stages.find(s => s.stage === 'deep')
   return { awakeCount: awake.length, firstDeepMin: firstDeep ? Math.round((firstDeep.start - t0) / 60000) : null }
+}
+
+/* ---------- Garmin sleep sub-scores ---------- */
+export const SUB_SCORES = [
+  { key: 'duration', group: 'night', label: 'Duration', lower: 'duration' },
+  { key: 'stress', group: 'night', label: 'Sleep stress', lower: 'sleep stress' },
+  { key: 'awakenings', group: 'night', label: 'Awakenings', lower: 'awakenings' },
+  { key: 'restlessness', group: 'night', label: 'Restlessness', lower: 'restlessness' },
+  { key: 'deep', group: 'stages', label: 'Deep', lower: 'deep sleep' },
+  { key: 'light', group: 'stages', label: 'Light', lower: 'light sleep' },
+  { key: 'rem', group: 'stages', label: 'REM', lower: 'REM sleep' },
+]
+const QUALIFIERS = { EXCELLENT: { label: 'Excellent', tone: 'good', rank: 3 }, GOOD: { label: 'Good', tone: 'good', rank: 2 }, FAIR: { label: 'Fair', tone: 'warning', rank: 1 }, POOR: { label: 'Poor', tone: 'serious', rank: 0 } }
+const hoursText = s => String(Math.round(s / 360) / 10)
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1)
+const listText = a => a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} and ${a.at(-1)}`
+
+function subScoreDetail(key, sub, sleep) {
+  const lo = sub.optimalLow, hi = sub.optimalHigh, both = num(lo) && num(hi)
+  const parts = []
+  if (key === 'duration') {
+    if (num(sleep.durationSec)) parts.push(`${fmtDuration(sleep.durationSec)} asleep`)
+    if (both) parts.push(`optimal ${hoursText(lo)}–${hoursText(hi)} h`)
+  } else if (key === 'stress') {
+    if (num(sleep.avgSleepStress)) parts.push(`average ${Math.round(sleep.avgSleepStress)}`)
+    if (both) parts.push(lo === 0 ? `optimal ${hi} or lower` : `optimal ${lo}–${hi}`)
+  } else if (key === 'awakenings') {
+    const n = sleep.awakeCount
+    if (num(n)) parts.push(n === 0 ? 'no awakenings' : n === 1 ? 'woke once' : `woke ${n} times`)
+    if (both) parts.push(lo === 0 ? `optimal ${hi} or fewer` : `optimal ${lo}–${hi}`)
+  } else if (key === 'restlessness') parts.push('Movement while asleep')
+  else {
+    if (num(sub.value)) parts.push(`${Math.round(sub.value)}% of sleep`)
+    if (both) parts.push(`optimal ${lo}–${hi}%`)
+  }
+  return cap(parts.join(' · '))
+}
+
+/** Garmin's per-part ratings of a night, in display order, or null when none are rated. */
+export function subScoreRows(sleep) {
+  const subs = sleep?.subScores
+  if (!subs) return null
+  const rows = []
+  for (const d of SUB_SCORES) {
+    const sub = subs[d.key], q = QUALIFIERS[sub?.qualifier]
+    if (!q) continue
+    rows.push({ ...d, qualifier: sub.qualifier, qualLabel: q.label, tone: q.tone, detail: subScoreDetail(d.key, sub, sleep) })
+  }
+  return rows.length ? rows : null
+}
+
+/** One sentence naming the parts that held the score back (worst first). */
+export function subScoreSummary(rows) {
+  if (!rows?.length) return null
+  const held = rows.filter(r => r.tone !== 'good').sort((a, b) => QUALIFIERS[a.qualifier].rank - QUALIFIERS[b.qualifier].rank)
+  if (!held.length) return { tone: 'good', held: [], text: 'Every part Garmin rated was good or better.' }
+  return { tone: 'warning', held: held.map(r => r.key), text: `${cap(listText(held.map(r => r.lower)))} held your score back.` }
+}
+
+/** How often each part rated fair or poor across the given days. */
+export function subScoreTally(days, dates) {
+  const acc = Object.fromEntries(SUB_SCORES.map(d => [d.key, { rated: 0, low: 0 }]))
+  let nights = 0
+  for (const date of dates) {
+    const subs = days[date]?.sleep?.subScores
+    if (!subs) continue
+    let any = false
+    for (const d of SUB_SCORES) {
+      const q = QUALIFIERS[subs[d.key]?.qualifier]
+      if (!q) continue
+      any = true
+      acc[d.key].rated += 1
+      if (q.rank <= 1) acc[d.key].low += 1
+    }
+    if (any) nights += 1
+  }
+  const items = SUB_SCORES.filter(d => acc[d.key].rated > 0).map(d => ({ key: d.key, label: cap(d.lower), lower: d.lower, ...acc[d.key] }))
+    .sort((a, b) => b.low / b.rated - a.low / a.rated)
+  const top = items[0]
+  const text = nights === 0 ? null : !top || top.low === 0 ? `Every part rated good or better on all ${nights} nights.` : `${top.label} rated fair or poor most often: ${top.low} of ${top.rated} nights.`
+  return { nights, items, text }
 }

@@ -79,8 +79,10 @@ Everything is keyed by **local calendar day** (`'YYYY-MM-DD'`, see `lib/dates.js
   `intensity`, `readiness`, `weight`, `training` (derived from that day's activities, never fetched).
   `heartRate.samples` is intraday HR in 10-minute buckets (`[bucketTs, bpm]`, only with ≥ 2 buckets);
   `sleep.subScores` holds Garmin's per-component sleep qualifiers (duration, stress, awakenings,
-  restlessness, rem, light, deep). Demo data mirrors a Personal API key (no readiness, no SpO2, no
-  sleep-time HR/HRV) except the hypnogram, which is kept so the timeline chart stays exercised.
+  restlessness, rem, light, deep), shown on the Sleep page through `pages/sleepLogic.js`
+  (`subScoreRows`, `subScoreSummary`, `subScoreTally`). Demo data mirrors a Personal API key (no
+  readiness, no SpO2, no sleep-time HR/HRV) except the hypnogram, which is kept so the timeline chart
+  stays exercised.
 - **Activity** — normalised activity summary (`id`, `type`, `day`, `startTs`, durations, distance,
   HR, training load/effect, HR zones, `raw` = original Garmin JSON for the detail page).
 - **Profile** — `displayName`, `fullName`, `timeZone`, `stepGoal`, `sleepNeedSec`.

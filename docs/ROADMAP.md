@@ -24,7 +24,7 @@ by the user and kept on the device.
 - **Phase 1 · Daily coach**
   - [x] A2 Recovery breakdown — what moved today's recovery (sleep, HRV, RHR, respiration) (Have)
   - [x] A3 Health monitor — RHR / HRV / respiration against the 30-day normal range; SpO₂ only if present (Have)
-  - [ ] A5 Garmin sleep sub-scores — duration, stress, awakenings, restlessness, stage mix (Have — in sleep summaries)
+  - [x] A5 Garmin sleep sub-scores — duration, stress, awakenings, restlessness, stage mix (Have — in sleep summaries)
   - [ ] A4 Sleep coach — 7-day sleep bank, tonight's need, bedtime planner from a wake time (Have)
   - [ ] A1 Effort score + daily target — strain-like 0–100 from training load and steps, target from recovery (Have)
   - [ ] A6 Resilience — 14-day recovery vs strain balance (Have)
@@ -84,4 +84,6 @@ by the user and kept on the device.
 - A2 Recovery breakdown: "What moved it" card on the Recovery report (any day via `?date=`),
   linked from Today and Morning; overnight respiration added to the registry (`eb581f7`).
 - A3 Health monitor: `#/reports/health` compares resting HR, HRV, overnight breathing (and SpO₂
-  when recorded) with your own 30-night normal range; status row on Today, card on Reports.
+  when recorded) with your own 30-night normal range; status row on Today, card on Reports (`740fb7e`).
+- A5 Sleep sub-scores: "What shaped your score" on Sleep shows Garmin's rating, your value and the
+  optimal range for each part of the night; "What holds your score back" tallies fair/poor nights per range.

@@ -58,6 +58,11 @@ Why things are the way they are. Read before "fixing" something that looks odd.
   Values are rounded to display precision before comparing so the verdict always matches the numbers
   shown. HRV uses Garmin's balanced range when the night has one. SpO₂ appears only when the watch
   records it. Outside in the "better" direction (lower RHR, higher HRV) is neutral, not good or bad.
+- **Sleep sub-scores are Garmin's, shown as-is.** The rating and optimal range come straight from
+  Garmin; we only pair them with the night's own number. Restlessness has no raw value on Personal
+  keys, so it shows the rating alone. Stage shares there are of time asleep (Garmin's definition),
+  while the Sleep stages card counts time awake too — the card's footnote says so. The trend tally
+  appears from 7 rated nights and states the count.
 - **Delta noise floor.** Day-to-day changes like "−0.4" are noise; `isMeaningfulDelta()` turns them
   into "Same". Thresholds per metric in `MIN_DELTA` (`lib/metrics.js`).
 - **Insights are trends with sample sizes**, never causal or medical claims, and stay silent below
