@@ -17,6 +17,7 @@ const P = {
   'chevron-left': <path d="m15 5-7 7 7 7" />,
   'chevron-right': <path d="m9 5 7 7-7 7" />,
   'chevron-down': <path d="m5 9 7 7 7-7" />,
+  tag: <><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.5 1.5 0 0 1 0 2.1l-6.6 6.6a1.5 1.5 0 0 1-2.1 0L3.5 12.2Z" /><circle cx="8" cy="8" r="1.5" /></>,
   check: <path d="m4.500 12.500 5 5L20 6.500" />,
   alert: <><path d="M12 3 2 20h20L12 3Z" /><path d="M12 10v4.500M12 17.500v.01" /></>,
   x: <path d="m6 6 12 12M18 6 6 18" />,

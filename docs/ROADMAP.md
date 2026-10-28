@@ -30,7 +30,7 @@ by the user and kept on the device.
   - [x] A6 Resilience — 14-day recovery vs strain balance (Have)
   - [x] A7 Day timeline — sleep, activities, intraday HR and Body Battery on one line (Have; no stress timeline)
 - **Phase 2 · Journal** (Log; never leaves the device)
-  - [ ] B1 Daily tags (alcohol, late meal, caffeine, travel, …) with a quick morning check-in
+  - [x] B1 Daily tags (alcohol, late meal, caffeine, travel, …) with a quick morning check-in
   - [ ] B2 Habit impact — ≥ 5 days with and ≥ 5 without before showing a difference, with sample sizes
   - [ ] B3 Day status — sick / injured / travelling / break, excluded from baselines
   - [ ] B4 Counters — water, caffeine, alcohol
@@ -52,6 +52,7 @@ by the user and kept on the device.
 - [ ] Morning check reachable from the iPhone home screen (iOS ignores manifest shortcuts — needs an
   Apple Shortcuts recipe or a separate bookmark to `#/morning`).
 - [ ] Notifications/reminders (limited on iOS PWAs — investigate Web Push support).
+- [ ] Custom tags (Log) — let the user add their own journal tags (the store and export already accept any valid tag key).
 - [ ] Optional encrypted export (password-protected JSON).
 
 ## Tech debt
@@ -89,4 +90,11 @@ by the user and kept on the device.
   optimal range for each part of the night; "What holds your score back" tallies fair/poor nights per range (`3f7a64a`).
 - A4 Sleep coach: "Tonight" card on Sleep turns a wake time (your usual weekday/weekend one, or
   your choice) into a bedtime covering sleep need + sleep-bank payback + usual time awake; 7-night
-  "Sleep bank" card; "Tonight" row on Today; sleep need settable in the card.
+  "Sleep bank" card; "Tonight" row on Today; sleep need settable in the card (`16a3c80`).
+- A1 Effort score: daily effort 0–100 from training load and steps against a target from recovery,
+  `#/reports/effort`, Effort row on Today (`e847bcb`).
+- A6 Resilience: 14-day recovery vs effort balance with a quadrant map, `#/reports/resilience` (`e3b3a1d`).
+- A7 Day timeline: `#/reports/timeline?date=` shows sleep, workouts, intraday heart rate and Body Battery
+  on one axis with an event list (`e2cda50`).
+- B1 Daily tags: on-device journal of tags (alcohol, late meal, travel, …) in its own IndexedDB store; check-in
+  card on Morning, Journal row on Today, `#/journal?date=`, included in JSON export/import (this PR).

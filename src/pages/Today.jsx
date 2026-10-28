@@ -12,6 +12,7 @@ import { MIN_DAYS, effortFor, effortStatus, effortTarget, statusText } from '../
 import { healthMonitor, monitorSummary } from '../lib/health'
 import { bankText, clockFromNorm, sleepCoach } from './sleepLogic'
 import { bodyBatteryNow, deltaVs7, greetingFor, headlineFor, intensityWeek, latestActivity, recoveryFor, weekGrid, whenLabel } from '../lib/homeLogic'
+import { checkinDay, journalStats, tagLabels } from '../lib/journal'
 import { Badge, Button, Card, Empty, Icon, InstallHint, Meter, PageHeader, Ring, SectionTitle, StatTile, toast } from '../components'
 
 const trend = key => `#/trends/${key}`
@@ -89,6 +90,18 @@ function EffortRow({ eff, target, recScore }) {
   </a>
 }
 
+function JournalRow({ journal, asOf }) {
+  const day = checkinDay(), entry = journal[day], when = day === asOf ? 'today' : 'yesterday'
+  const st = useMemo(() => journalStats(journal, asOf, 7), [journal, asOf])
+  return <a className="home-act home-journal" href="#/journal">
+    <span className="home-act-ico"><Icon name="tag" size={22} /></span>
+    <span className="home-act-text"><span className="home-act-label">Journal</span>
+      <span className="home-act-name">{!entry ? `Check in for ${when}` : entry.tags.length ? tagLabels(entry.tags).join(', ') : `Nothing tagged ${when}`}</span>
+      <span className="home-act-sub">{!entry ? 'Alcohol, late meals, travel and more · stays on this device' : `Logged ${st.logged} of the last 7 days`}</span></span>
+    <Icon name="chevron-right" size={18} />
+  </a>
+}
+
 function TonightRow({ coach }) {
   const p = coach.plan, bed = clockFromNorm(p.bedNorm), wake = clockFromNorm(p.wakeNorm)
   return <a className="home-act home-tonight" href="#/sleep">
@@ -104,6 +117,7 @@ export default function Today() {
   const days = useStore(s => s.days)
   const activities = useStore(s => s.activities)
   const profile = useStore(s => s.profile)
+  const journal = useStore(s => s.journal)
   const source = useStore(s => s.source)
   const asOf = today(), { sleepNeedHours, wakeTime } = usePrefs()
   useSyncToast()
@@ -165,6 +179,7 @@ export default function Today() {
     </a>}
 
     {coach.has && coach.plan && <TonightRow coach={coach} />}
+    <JournalRow journal={journal} asOf={asOf} />
 
     <div className="home-tiles">
       <Tile days={days} asOf={asOf} metricKey="sleepScore" overnight href="#/sleep" sub={l => fmtDuration(l.record.sleep?.durationSec)} spark={undefined} />

@@ -88,6 +88,11 @@ export const SCHEMA_VERSION = 1
  * @property {number[]|null} hrZonesSec  seconds in HR zones 1–5
  * @property {object} [raw]             original summary, for the detail page's raw view
  *
+ * @typedef {Object} JournalEntry  User-entered, stored in the `journal` store, never synced. An empty `tags` list means "checked in, nothing to tag".
+ * @property {string} date       local YYYY-MM-DD the tags belong to
+ * @property {string[]} tags
+ * @property {number} updatedAt  epoch ms of the last edit
+ *
  * @typedef {Object} Profile
  * @property {string|null} displayName
  * @property {string|null} fullName

@@ -30,6 +30,7 @@ const Sleep = page(() => import('./pages/Sleep'))
 const Reports = page(() => import('./pages/Reports'))
 const Activities = page(() => import('./pages/Activities'))
 const ActivityDetail = page(() => import('./pages/ActivityDetail'))
+const Journal = page(() => import('./pages/Journal'))
 const Insights = page(() => import('./pages/Insights'))
 const SyncCenter = page(() => import('./pages/SyncCenter'))
 const Settings = page(() => import('./pages/Settings'))
@@ -48,10 +49,10 @@ const NAV = [
   { id: 'trends', label: 'Trends', icon: 'trends', to: '#/trends', match: p => p.startsWith('/trends') },
   { id: 'sleep', label: 'Sleep', icon: 'sleep', to: '#/sleep', match: p => p.startsWith('/sleep') },
   { id: 'reports', label: 'Reports', icon: 'reports', to: '#/reports', match: p => p.startsWith('/reports') },
-  { id: 'more', label: 'More', icon: 'more', to: null, match: p => ['/insights', '/activities', '/sync', '/settings'].some(x => p.startsWith(x)) },
+  { id: 'more', label: 'More', icon: 'more', to: null, match: p => ['/journal', '/insights', '/activities', '/sync', '/settings'].some(x => p.startsWith(x)) },
 ]
 const MORE = [
-  { label: 'Insights', icon: 'insights', to: '#/insights' }, { label: 'Activities', icon: 'activity', to: '#/activities' },
+  { label: 'Journal', icon: 'tag', to: '#/journal' }, { label: 'Insights', icon: 'insights', to: '#/insights' }, { label: 'Activities', icon: 'activity', to: '#/activities' },
   { label: 'Sync Center', icon: 'sync', to: '#/sync' }, { label: 'Settings', icon: 'settings', to: '#/settings' },
 ]
 const THEMES = [{ value: 'night', label: 'Night' }, { value: 'day', label: 'Day' }, { value: 'color', label: 'Color' }, { value: 'auto', label: 'Auto' }]
@@ -113,6 +114,7 @@ function Routes({ route }) {
   if (a === 'sleep') return <Sleep />
   if (a === 'reports') { const R = b && REPORTS[b]; return R ? <R /> : <Reports /> }
   if (a === 'activities') return b ? <ActivityDetail key={b} id={b} /> : <Activities />
+  if (a === 'journal') return <Journal />
   if (a === 'insights') return <Insights />
   if (a === 'sync') return <SyncCenter />
   if (a === 'settings') return <Settings />

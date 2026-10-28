@@ -2,6 +2,7 @@
 import { SCHEMA_VERSION } from './schema.js'
 import { METRICS, METRIC_KEYS } from '../lib/metrics.js'
 import { toCsv } from '../lib/csv.js'
+import { cleanTags } from '../lib/journal.js'
 
 export const EXPORT_APP = 'mk-fitness'
 export const EXPORT_FORMAT = 1
@@ -9,7 +10,7 @@ const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
 const validDay = s => typeof s === 'string' && DAY_RE.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00Z`)) && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s
 const toList = days => Array.isArray(days) ? days : Object.values(days || {})
 
-/** Build the portable JSON document. Never includes the Garmin token, the sync log or lock settings. */
+/** Build the portable JSON document. Includes the user's journal (additive, so format stays 1). Never includes the Garmin token, the sync log or lock settings. */
 export function buildExport(state, { includeRaw = false } = {}) {
   const days = toList(state.days).filter(d => d?.date).sort((a, b) => a.date.localeCompare(b.date))
   const activities = (state.activities || []).map(a => {
@@ -17,16 +18,17 @@ export function buildExport(state, { includeRaw = false } = {}) {
     const { raw, ...rest } = a // eslint-disable-line no-unused-vars
     return rest
   })
+  const journal = Object.values(state.journal || {}).filter(e => e?.date).sort((a, b) => a.date.localeCompare(b.date))
   return {
     app: EXPORT_APP, format: EXPORT_FORMAT, schemaVersion: SCHEMA_VERSION,
     exportedAt: new Date().toISOString(), source: state.source || 'garmin',
-    profile: state.profile || null, days, activities,
+    profile: state.profile || null, days, activities, journal,
   }
 }
 
 const fail = msg => { throw new Error(msg) }
 
-/** Validate an export file's text. Returns { days, activities, profile, summary } or throws a readable Error. */
+/** Validate an export file's text. Returns { days, activities, journal, profile, summary } or throws a readable Error. */
 export function parseImport(text) {
   let doc
   try { doc = JSON.parse(text) } catch { fail('This is not a JSON file. Only MK Fitness JSON exports can be imported.') }
@@ -51,10 +53,18 @@ export function parseImport(text) {
   })
   if (doc.profile != null && (typeof doc.profile !== 'object' || Array.isArray(doc.profile))) fail('The profile in this export is invalid.')
 
-  const keys = [...days.map(d => d.date), ...activities.map(a => a.day).filter(Boolean)].sort()
+  if (doc.journal != null && !Array.isArray(doc.journal)) fail('The journal in this export is invalid.')
+  const journal = (doc.journal || []).map((e, i) => {
+    if (!e || typeof e !== 'object' || Array.isArray(e)) fail(`Journal entry ${i + 1} is not an object.`)
+    if (!validDay(e.date)) fail(`Journal entry ${i + 1} has an invalid date.`)
+    if (!Array.isArray(e.tags)) fail(`Journal entry ${i + 1} has no tags list.`)
+    return { ...e, tags: cleanTags(e.tags), updatedAt: Number.isFinite(e.updatedAt) ? e.updatedAt : 0 }
+  })
+
+  const keys = [...days.map(d => d.date), ...activities.map(a => a.day).filter(Boolean), ...journal.map(e => e.date)].sort()
   return {
-    days, activities, profile: doc.profile || null,
-    summary: { days: days.length, activities: activities.length, from: keys[0] || null, to: keys.at(-1) || null },
+    days, activities, journal, profile: doc.profile || null,
+    summary: { days: days.length, activities: activities.length, journal: journal.length, from: keys[0] || null, to: keys.at(-1) || null },
   }
 }
 

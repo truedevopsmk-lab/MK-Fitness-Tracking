@@ -11,7 +11,7 @@ reasons behind the choices see [DECISIONS.md](DECISIONS.md).
 │ pages ── useStore ── store.js ◀── engine.js ── garmin.js ─┼──▶│  Worker   │──▶│ personal.connect │
 │   │                    │            │    normalize.js     │   │ (CORS     │   │ api.garmin.com   │
 │   │                    ▼            ▼                     │   │  proxy)   │   └──────────────────┘
-│   └── lib/* ◀──── IndexedDB (days, activities, meta)      │   └───────────┘
+│   └── lib/* ◀──── IndexedDB (days, activities, journal, meta)      │   └───────────┘
 │        (stats, metrics, insights)   localStorage (prefs, token, lock)
 └──────────────────────────────────────────────────────────┘
 ```
@@ -80,6 +80,8 @@ Everything is keyed by **local calendar day** (`'YYYY-MM-DD'`, see `lib/dates.js
 - **DayRecord** — one per day, made of optional sections, each optional field possibly `null`:
   `steps`, `stress`, `bodyBattery`, `sleep`, `hrv`, `heartRate`, `respiration`, `movement`,
   `intensity`, `readiness`, `weight`, `training` (derived from that day's activities, never fetched).
+- **JournalEntry** — `{ date, tags, updatedAt }`, entered by the user and kept in its own `journal` store.
+  Never part of a DayRecord and never touched by sync. `tags: []` means "checked in, nothing to tag".
   `heartRate.samples` is intraday HR in 10-minute buckets (`[bucketTs, bpm]`, only with ≥ 2 buckets);
   `sleep.subScores` holds Garmin's per-component sleep qualifiers (duration, stress, awakenings,
   restlessness, rem, light, deep), shown on the Sleep page through `pages/sleepLogic.js`
@@ -105,13 +107,14 @@ One plain object with subscribers; read with `useStore(selector)`, write only th
 | `source` | `'garmin'` or `'demo'` (header shows a DEMO chip) |
 | `days` | `{ 'YYYY-MM-DD': DayRecord }` |
 | `activities` | `Activity[]`, newest first |
+| `journal` | `{ 'YYYY-MM-DD': JournalEntry }` — user-entered tags, never synced |
 | `profile` | `Profile` |
 | `syncMeta` | `{ lastSuccessAt, lastAttemptAt, lastFullAt, lastResult, lastError, coverage }` |
 | `endpoints` | `{ [endpointId]: EndpointStatus }` (see Sync) |
 | `sync` | live progress `{ running, mode, phase, done, total, current, rateLimitedUntil, message }` |
 | `log` | last 200 sync log lines |
 
-Actions: `init`, `applyDays`, `applyActivities`, `setProfile`, `setSync`, `resetSync`, `setEndpoint`,
+Actions: `init`, `applyDays`, `applyActivities`, `setProfile`, `setJournal`, `toggleTag`, `clearJournalDay`, `applyJournal`, `setSync`, `resetSync`, `setEndpoint`,
 `setSyncMeta`, `log`, `importData`, `clearLocalData`, `switchSource`.
 
 > **Selector rule:** a selector must return an existing reference or a primitive
@@ -122,9 +125,10 @@ Actions: `init`, `applyDays`, `applyActivities`, `setProfile`, `setSync`, `reset
 
 | Where | Key | What |
 |---|---|---|
-| IndexedDB `garmin-personal-dashboard` (v2) | store `days` (keyPath `date`) | DayRecords |
+| IndexedDB `garmin-personal-dashboard` (v3) | store `days` (keyPath `date`) | DayRecords |
 | | store `activities` (keyPath `id`) | Activities |
-| | store `meta` | `profile`, `syncMeta`, `endpoints`, `log` |
+| | store `journal` (keyPath `date`) | JournalEntries (user-entered tags) |
+| | store `meta` | `profile`, `syncMeta`, `endpoints`, `log`, `demoJournal` |
 | | store `data` | legacy v1 blobs — migrated then cleared by `migrate.js` |
 | IndexedDB `mk-fitness-demo` | same stores | demo data only |
 | localStorage | `garmin_dashboard_session` | `{ accessToken, expiresAt }` — the API key itself is never stored |
@@ -198,6 +202,7 @@ Hash routes (work on static hosting): `useRoute()` → `{ path, segments, params
 | `#/sleep?date=&range=` | `pages/Sleep.jsx` (`#/reports/sleep` redirects here) |
 | `#/reports`, `#/reports/:kind?range=` (recovery and timeline also `&date=`) | `pages/Reports.jsx`, `pages/reports/*` (map in `App.jsx` `REPORTS`) |
 | `#/activities`, `#/activities/:id` | `pages/Activities.jsx`, `pages/ActivityDetail.jsx` |
+| `#/journal?date=` | `pages/Journal.jsx` |
 | `#/insights` | `pages/Insights.jsx` |
 | `#/sync` | `pages/SyncCenter.jsx` |
 | `#/settings` | `pages/Settings.jsx` |
@@ -233,6 +238,7 @@ stays hidden on watches that never record it). Also exported: `SLEEP_STAGES`, `S
 | `RangeTabs`, `Segmented`, `DateStepper` | filters (7D…1Y, options, day stepping) |
 | `PageHeader`, `SectionTitle`, `KeyValue`, `DataTable`, `MissingNote` | layout + data display |
 | `Badge`/`StatusPill`, `Button`, `Empty`, `Icon` | basics (`Icon` is an inline SVG set) |
+| `TagChips` | toggle chips for journal tags (check icon when on) |
 | `Sheet`, `ConfirmDialog`, `toast()` + `Toaster` | overlays and feedback |
 | `PullToRefresh`, `InstallHint`, `ConnectForm`, `ErrorBoundary`, `LockScreen` | app-level |
 
@@ -285,6 +291,7 @@ until the app is closed and reopened once after a deploy.
 - The app lock (WebAuthn platform authenticator or PIN) keeps casual eyes out; it does **not**
   encrypt data. PINs are stored as salted SHA-256; wrong PINs are throttled (5 free, then 30 s
   doubling to 15 min, persisted).
+- The journal stays on the device and is included in JSON exports (additive; export format stays 1).
 - Exports contain health data but never the token, sync log or lock settings.
 - The Worker forwards any request it receives (it only sets CORS for `ALLOWED_ORIGIN`); Garmin
   still requires the user's token. See [ROADMAP.md](ROADMAP.md) for hardening.

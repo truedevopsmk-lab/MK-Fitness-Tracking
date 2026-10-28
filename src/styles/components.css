@@ -250,3 +250,11 @@
 .kit-stack { display: flex; flex-direction: column; gap: 12px; }
 .kit-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 @media (pointer: coarse) { .seg-btn { min-height: 44px; } .btn-sm { min-height: 44px; } }
+
+/* Tag chips (journal) */
+.tag-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-2); font: 600 14px/1 var(--font-ui); transition: background .15s, border-color .15s, color .15s; }
+.tag-chip:hover { border-color: var(--text-3); }
+.tag-chip:active { transform: scale(.97); }
+.tag-chip.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.tag-chip.is-on svg { color: var(--accent-text); margin-left: -2px; }

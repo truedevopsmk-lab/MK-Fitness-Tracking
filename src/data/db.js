@@ -1,10 +1,11 @@
 // IndexedDB persistence. Stores normalised records only (see schema.js).
 //   days        keyPath 'date'  → DayRecord
 //   activities  keyPath 'id'    → Activity
-//   meta        out-of-line key → profile, syncMeta, endpoints, log
+//   journal     keyPath 'date'  → JournalEntry (user-entered tags, never synced)
+//   meta        out-of-line key → profile, syncMeta, endpoints, log, demoJournal
 //   data        legacy v1 store (raw Garmin payloads) — read once by migrate.js, then cleared
 
-const REAL_DB = 'garmin-personal-dashboard', DEMO_DB = 'mk-fitness-demo', VERSION = 2
+const REAL_DB = 'garmin-personal-dashboard', DEMO_DB = 'mk-fitness-demo', VERSION = 3
 
 let dbName = REAL_DB
 let handle = null
@@ -20,6 +21,7 @@ function open() {
       if (!db.objectStoreNames.contains('data')) db.createObjectStore('data')
       if (!db.objectStoreNames.contains('days')) db.createObjectStore('days', { keyPath: 'date' })
       if (!db.objectStoreNames.contains('activities')) db.createObjectStore('activities', { keyPath: 'id' })
+      if (!db.objectStoreNames.contains('journal')) db.createObjectStore('journal', { keyPath: 'date' })
       if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta')
     }
     r.onsuccess = () => { r.result.onversionchange = () => { r.result.close(); handle = null }; resolve(r.result) }
@@ -42,13 +44,20 @@ export async function putMany(store, records) {
   return done(tx)
 }
 
+export async function deleteMany(store, keys) {
+  if (!keys.length) return
+  const db = await open(), tx = db.transaction(store, 'readwrite'), os = tx.objectStore(store)
+  keys.forEach(k => os.delete(k))
+  return done(tx)
+}
+
 export async function setMeta(entries) {
   const db = await open(), tx = db.transaction('meta', 'readwrite'), os = tx.objectStore('meta')
   Object.entries(entries).forEach(([k, v]) => os.put(v, k))
   return done(tx)
 }
 
-export async function clearStores(stores = ['days', 'activities', 'meta', 'data']) {
+export async function clearStores(stores = ['days', 'activities', 'journal', 'meta', 'data']) {
   const db = await open(), tx = db.transaction(stores, 'readwrite')
   stores.forEach(s => tx.objectStore(s).clear())
   return done(tx)

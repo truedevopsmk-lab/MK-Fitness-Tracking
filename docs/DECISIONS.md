@@ -19,6 +19,19 @@ Why things are the way they are. Read before "fixing" something that looks odd.
   what real users see (e.g. the Today hero shows "Recovery estimate"). The hypnogram is kept so the
   timeline chart stays covered.
 
+- **The journal is its own store, never synced.** Tags are entered by the user, so they live in a `journal`
+  store beside `days`, never inside a DayRecord, and no sync path can overwrite them. JSON exports include them.
+- **A tag belongs to the day it happened.** "A drink last night" goes on yesterday, so it lines up with the
+  night that followed. The check-in day is yesterday before 18:00 and today from 18:00.
+- **An entry with no tags means "logged, nothing to tag".** A day with no entry is "not logged". Comparing days
+  with a tag against logged days without it (Habit impact) needs that difference, so removing the last tag keeps
+  the entry and only "Clear day" deletes it.
+- **Journal import: newest edit wins, ties keep local.** An incoming entry replaces the local one only when it
+  has a later `updatedAt` and different tags.
+- **Demo journal has its own seed and follows sleep.** `generateDemoJournal` uses a separate RNG so `generateDemo`
+  output is unchanged, and makes alcohol and late meals likelier before poor nights, so Habit impact has
+  something to show. Yesterday and today stay unlogged to show the check-in prompt.
+
 ## Sync
 
 - **Sequential requests, not parallel.** Garmin rate-limits; one-at-a-time with a gap and backoff is

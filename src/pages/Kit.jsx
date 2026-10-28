@@ -6,7 +6,7 @@ import { fmtDuration } from '../lib/format'
 import { SLEEP_STAGES, STRESS_LEVELS } from '../lib/metrics'
 import { lastNDays, metricSeries } from '../data/select'
 import { summarize } from '../lib/stats'
-import { Badge, Button, Card, ConfirmDialog, DataTable, DateStepper, Empty, Icon, InstallHint, KeyValue, Meter, MissingNote, PageHeader, RangeTabs, Ring, SectionTitle, Segmented, Sheet, StatTile, toast } from '../components'
+import { Badge, Button, Card, ConfirmDialog, DataTable, DateStepper, Empty, Icon, InstallHint, KeyValue, Meter, MissingNote, PageHeader, RangeTabs, Ring, SectionTitle, Segmented, Sheet, StatTile, TagChips, toast } from '../components'
 import TrendChart from '../charts/TrendChart'
 import StackedBars from '../charts/StackedBars'
 import Sparkline from '../charts/Sparkline'
@@ -15,7 +15,7 @@ const ICONS = ['today', 'trends', 'sleep', 'reports', 'more', 'sync', 'settings'
 
 export default function Kit() {
   const days = useStore(s => s.days)
-  const [range, setRange] = useState(30), [date, setDate] = useState(today()), [seg, setSeg] = useState('a'), [sheet, setSheet] = useState(false), [confirm, setConfirm] = useState(false)
+  const [range, setRange] = useState(30), [date, setDate] = useState(today()), [seg, setSeg] = useState('a'), [sheet, setSheet] = useState(false), [confirm, setConfirm] = useState(false), [chips, setChips] = useState(['nap'])
   const end = today()
   const series = k => metricSeries(days, k, addDays(end, -(range - 1)), end)
   const sleep = series('sleepScore'), steps = series('steps'), hrv = series('hrv'), dur = series('sleepDuration'), rhr = series('restingHr')
@@ -50,6 +50,7 @@ export default function Kit() {
           <RangeTabs value={range} onChange={setRange} />
           <Segmented value={seg} onChange={setSeg} options={[{ value: 'a', label: 'Day' }, { value: 'b', label: 'Week' }, { value: 'c', label: 'Month' }]} />
           <DateStepper date={date} onChange={setDate} />
+          <TagChips label="Example tags" options={[{ key: 'alcohol', label: 'Alcohol' }, { key: 'nap', label: 'Nap' }, { key: 'travel', label: 'Travel' }]} selected={chips} onToggle={k => setChips(c => c.includes(k) ? c.filter(x => x !== k) : [...c, k])} />
           <div className="kit-row"><Button variant="primary">Primary</Button><Button>Secondary</Button><Button variant="ghost">Ghost</Button><Button variant="danger">Delete</Button></div>
           <div className="kit-row"><Button size="sm" icon="sync">Small</Button><Button variant="primary" loading>Syncing</Button><Button disabled>Disabled</Button></div>
           <div className="kit-row"><Badge tone="good">Good</Badge><Badge tone="warning">Warning</Badge><Badge tone="serious">Serious</Badge><Badge tone="critical">Critical</Badge><Badge tone="neutral">Neutral</Badge><Badge tone="accent">Accent</Badge></div>

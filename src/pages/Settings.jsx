@@ -74,7 +74,7 @@ export default function Settings() {
   const profile = useStore(s => s.profile)
   const garminName = resolveName('', profile)
   const source = useStore(s => s.source), syncMeta = useStore(s => s.syncMeta)
-  const days = useStore(s => s.days), activities = useStore(s => s.activities)
+  const days = useStore(s => s.days), activities = useStore(s => s.activities), journal = useStore(s => s.journal)
   const [usage, setUsage] = useState(null)
   const [confirm, setConfirm] = useState(null) // 'source' | 'clear' | 'signout' | 'import'
   const [typed, setTyped] = useState('')
@@ -87,6 +87,7 @@ export default function Settings() {
   const hasSession = !!session()?.accessToken
 
   const dayCount = useMemo(() => Object.keys(days).length, [days])
+  const journalCount = useMemo(() => Object.keys(journal).length, [journal])
   const cov = useMemo(() => {
     if (syncMeta.coverage) return syncMeta.coverage
     const k = Object.keys(days).sort()
@@ -99,7 +100,7 @@ export default function Settings() {
   const exportJson = () => { downloadFile(`mk-fitness-export-${stamp}.json`, JSON.stringify(buildExport(getState()), null, 1), 'application/json'); toast('Export ready', { tone: 'good' }) }
   const exportDays = () => { downloadFile(`mk-fitness-daily-${stamp}.csv`, daysToCsv(days)); toast('Daily metrics CSV ready', { tone: 'good' }) }
   const exportActs = () => { downloadFile(`mk-fitness-activities-${stamp}.csv`, activitiesToCsv(activities)); toast('Activities CSV ready', { tone: 'good' }) }
-  const empty = dayCount === 0 && activities.length === 0
+  const empty = dayCount === 0 && activities.length === 0 && journalCount === 0
 
   const pickFile = async e => {
     const file = e.target.files?.[0]
@@ -112,7 +113,7 @@ export default function Settings() {
     setConfirm(null); setBusy(true)
     try {
       const r = await actions.importData(parsed)
-      toast(`Imported ${fmtNumber(r.days)} new or changed days and ${fmtNumber(r.activities)} activities`, { tone: 'good' })
+      toast(`Imported ${fmtNumber(r.days)} new or changed days${r.journal ? ',' : ' and'} ${fmtNumber(r.activities)} activities${r.journal ? ` and ${fmtNumber(r.journal)} journal days` : ''}`, { tone: 'good' })
       setImp(null)
     } catch (err) { toast(`Import failed: ${err.message}`, { tone: 'critical' }) }
     setBusy(false)
@@ -152,7 +153,7 @@ export default function Settings() {
         <KeyValue rows={[
           { label: 'Last synced', value: demo ? 'Not applicable' : lastSynced },
           { label: 'Coverage', value: cov ? `${fmtDay(cov.first, { day: 'numeric', month: 'short', year: 'numeric' })} to ${cov.last >= stamp ? 'today' : fmtDay(cov.last, { day: 'numeric', month: 'short', year: 'numeric' })}` : 'No data yet' },
-          { label: 'Stored', value: `${fmtNumber(dayCount)} days, ${fmtNumber(activities.length)} activities` },
+          { label: 'Stored', value: `${fmtNumber(dayCount)} days, ${fmtNumber(activities.length)} activities${journalCount > 0 ? `, ${fmtNumber(journalCount)} journal days` : ''}` },
           { label: 'Storage used', value: usage ? `${bytes(usage.usage)}` : 'Unknown', hint: 'Whole app, including cached files' },
         ]} />
         <div className="set-actions">
@@ -207,6 +208,7 @@ export default function Settings() {
           <KeyValue rows={[
             { label: 'Days', value: fmtNumber(imp.parsed.summary.days) },
             { label: 'Activities', value: fmtNumber(imp.parsed.summary.activities) },
+            ...(imp.parsed.summary.journal > 0 ? [{ label: 'Journal days', value: fmtNumber(imp.parsed.summary.journal) }] : []),
             { label: 'Date range', value: imp.parsed.summary.from ? `${fmtDay(imp.parsed.summary.from, { day: 'numeric', month: 'short', year: 'numeric' })} to ${fmtDay(imp.parsed.summary.to, { day: 'numeric', month: 'short', year: 'numeric' })}` : '—' },
           ]} />
           <div className="set-actions"><Button variant="primary" onClick={() => setConfirm('import')}>Import this data</Button><Button variant="ghost" onClick={() => setImp(null)}>Cancel</Button></div>
@@ -264,14 +266,14 @@ export default function Settings() {
       body={demo ? 'The app reloads and shows the data stored from your Garmin account. Demo data stays separate.' : 'The app reloads and shows generated demo data. Your Garmin data stays on this device, untouched.'}
       onConfirm={() => actions.switchSource(demo ? 'garmin' : 'demo')} onCancel={() => setConfirm(null)} />}
     {confirm === 'import' && imp?.parsed && <ConfirmDialog title="Import this data?" confirmLabel="Import"
-      body={`${fmtNumber(imp.parsed.summary.days)} days and ${fmtNumber(imp.parsed.summary.activities)} activities will be merged into ${demo ? 'the demo data' : 'your data'}. Nothing is deleted.`}
+      body={`${fmtNumber(imp.parsed.summary.days)} days${imp.parsed.summary.journal > 0 ? ',' : ' and'} ${fmtNumber(imp.parsed.summary.activities)} activities${imp.parsed.summary.journal > 0 ? ` and ${fmtNumber(imp.parsed.summary.journal)} journal days` : ''} will be merged into ${demo ? 'the demo data' : 'your data'}. Nothing is deleted.`}
       onConfirm={doImport} onCancel={() => setConfirm(null)} />}
     {confirm === 'signout' && <ConfirmDialog tone="danger" title="Sign out of Garmin?" confirmLabel="Sign out"
       body="This removes the session token from this device. Cached data stays unless you also clear it. To fully revoke access, revoke the Personal API key in your Garmin Connect settings."
       onConfirm={doSignOut} onCancel={() => setConfirm(null)} />}
     {confirm === 'clear' && <Sheet open onClose={() => setConfirm(null)} title="Clear local data?" size="sm"
       footer={<><Button variant="ghost" onClick={() => setConfirm(null)}>Cancel</Button><Button variant="danger" disabled={typed !== 'DELETE'} onClick={doClear}>Delete everything</Button></>}>
-      <p className="muted">This permanently deletes {fmtNumber(dayCount)} days and {fmtNumber(activities.length)} activities from this device and turns off the app lock. Export first if you want a backup.</p>
+      <p className="muted">This permanently deletes {fmtNumber(dayCount)} days{journalCount > 0 ? ',' : ' and'} {fmtNumber(activities.length)} activities{journalCount > 0 && ` and ${fmtNumber(journalCount)} journal days`} from this device and turns off the app lock. Export first if you want a backup.</p>
       <label className="field set-confirm"><span className="field-label">Type DELETE to confirm</span><input className="input" value={typed} onChange={e => setTyped(e.target.value)} autoCapitalize="characters" autoComplete="off" spellCheck={false} data-autofocus /></label>
     </Sheet>}
   </div>

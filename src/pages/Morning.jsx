@@ -1,16 +1,37 @@
 import { useMemo } from 'react'
 import { useDisplayName, withName } from '../lib/name'
 import '../styles/home.css'
-import { useStore } from '../state/store'
+import '../styles/journal.css'
+import { actions, useStore } from '../state/store'
 import { usePrefs } from '../lib/prefs'
 import { today } from '../lib/dates'
 import { fmtDuration } from '../lib/format'
 import { METRICS, SLEEP_STAGES, hrvStatusBand } from '../lib/metrics'
 import { latestValue } from '../data/select'
 import { bodyBatteryNow, deltaVs7, greetingFor, headlineFor, recommendationFor, recoveryFor, whenLabel } from '../lib/homeLogic'
-import { Badge, Button, Card, Empty, Icon, Ring } from '../components'
+import { TAGS, checkinDay } from '../lib/journal'
+import { Badge, Button, Card, Empty, Icon, Ring, TagChips, dayLabel } from '../components'
 
 const hueStyle = h => ({ '--m-hue': `var(--hue-${h})` })
+
+function CheckIn() {
+  const journal = useStore(s => s.journal)
+  const day = checkinDay(), entry = journal[day], when = day === today() ? 'today' : 'yesterday'
+  const tags = entry?.tags || [], n = tags.length
+  const options = TAGS.filter(t => t.quick || tags.includes(t.key))
+  return <Card className="morning-card jr-checkin" style={{ '--m-hue': 'var(--accent)' }}>
+    <span className="morning-label"><i className="tile-dot" aria-hidden="true" />Check-in · {dayLabel(day)}</span>
+    <h2 className="jr-q">Anything from {when}?</h2>
+    <TagChips label={`Tags for ${when}`} options={options} selected={tags} onToggle={k => actions.toggleTag(day, k)} />
+    <div className="jr-foot jr-foot-rule">
+      <span className="jr-status">{!entry ? 'Stays on this device' : n ? `${n} tag${n === 1 ? '' : 's'} saved` : 'Checked in · nothing to tag'}</span>
+      <span className="jr-actions">
+        {!entry && <Button size="sm" variant="secondary" onClick={() => actions.setJournal(day, { tags: [] })}>Nothing to tag</Button>}
+        <Button size="sm" variant="ghost" href={`#/journal?date=${day}`}>All tags</Button>
+      </span>
+    </div>
+  </Card>
+}
 
 export default function Morning() {
   const days = useStore(s => s.days)
@@ -71,6 +92,7 @@ export default function Morning() {
     <Card className="morning-card">
       <p className="morning-reco"><strong>{headlineFor(rec.score)}</strong>{recommendationFor(rec.score)}</p>
     </Card>
+    <CheckIn />
     <a className="morning-link" href="#/">Full dashboard<Icon name="chevron-right" size={18} /></a>
   </div>
 }
