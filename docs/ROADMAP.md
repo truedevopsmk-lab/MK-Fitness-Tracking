@@ -98,4 +98,4 @@ by the user and kept on the device.
   on one axis with an event list (`e2cda50`).
 - B1 Daily tags: on-device journal of tags (alcohol, late meal, travel, …) in its own IndexedDB store; check-in
   card on Morning, Journal row on Today, `#/journal?date=`, included in JSON export/import (`22f769e`).
-- B2 Habit impact: `#/reports/habits` compares the night after each tag with logged days without it (5+ each way, sample sizes always shown, clear vs varies), "What stands out" lead, card on Reports, link from Journal.
+- B2 Habit impact: `#/reports/habits` compares the night after each tag with logged days without it (5+ each way, sample sizes always shown, clear vs varies), "What stands out" lead, card on Reports, link from Journal (`fbf52bb`).
