@@ -6,7 +6,7 @@
 //
 //  title      page title · icon: Icon name · hue: registry hue name (tints the icon chip)
 //  subtitle   one line under the title, e.g. 'Stress through the day'
-//  range      selected day count (use useRange()) · onRange(n) · ranges: option list (default 7/30/60/120/365)
+//  range      selected day count (use useRange()) · optional, omit for single-day reports · onRange(n) · ranges: option list (default 7/30/60/120/365)
 //  summary    [{ label, value, sub?, tone? }]  tone: good|warning|serious|critical|neutral  (value may be a node)
 //  csv        () => ({ filename, rows, columns })  columns as in lib/csv.js — shows an Export CSV button
 //  hasData    false → Empty state with link to #/sync instead of children (default true)
@@ -225,10 +225,10 @@ export default function ReportLayout({ title, icon = 'reports', hue = 'steps', s
       ? <Card><Empty icon={icon} title={`No ${title.toLowerCase()} data yet`} body={emptyBody || 'Sync your Garmin data, or explore with demo data, and this report fills in.'} action={<Button variant="primary" href="#/sync">Open Sync Center</Button>} /></Card>
       : <>
         {lead}
-        <div className="rp-filter">
-          <RangeTabs value={range} onChange={onRange} options={ranges} />
+        {(range != null || asOf || missing?.missing > 0) && <div className="rp-filter">
+          {range != null && <RangeTabs value={range} onChange={onRange} options={ranges} />}
           {(asOf || missing?.missing > 0) && <div className="rp-filter-meta">{asOf && <span className="rp-asof">{asOf}</span>}{missing && <MissingNote {...missing} />}</div>}
-        </div>
+        </div>}
         {summary.length > 0 && <div className={`rp-summary rp-summary-${Math.min(summary.length, 4)}`}>
           {summary.map(s => <div className={`rp-stat${s.tone ? ` tone-${s.tone}` : ''}`} key={s.label}>
             <span className="rp-stat-label">{s.label}</span>

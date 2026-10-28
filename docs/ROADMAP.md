@@ -28,7 +28,7 @@ by the user and kept on the device.
   - [x] A4 Sleep coach — 7-day sleep bank, tonight's need, bedtime planner from a wake time (Have)
   - [x] A1 Effort score + daily target — strain-like 0–100 from training load and steps, target from recovery (Have)
   - [x] A6 Resilience — 14-day recovery vs strain balance (Have)
-  - [ ] A7 Day timeline — sleep, activities, intraday HR and Body Battery on one line (Have; no stress timeline)
+  - [x] A7 Day timeline — sleep, activities, intraday HR and Body Battery on one line (Have; no stress timeline)
 - **Phase 2 · Journal** (Log; never leaves the device)
   - [ ] B1 Daily tags (alcohol, late meal, caffeine, travel, …) with a quick morning check-in
   - [ ] B2 Habit impact — ≥ 5 days with and ≥ 5 without before showing a difference, with sample sizes

@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "for t in lib data home effort resilience health trends sleep insights portable activities name probe; do node scripts/test-$t.mjs || exit 1; done",
+    "test": "for t in lib data home effort resilience timeline health trends sleep insights portable activities name probe; do node scripts/test-$t.mjs || exit 1; done",
     "test:e2e": "node scripts/test-lock-e2e.mjs",
     "shots": "node scripts/shot.mjs",
     "icons": "node scripts/make-icons.mjs"

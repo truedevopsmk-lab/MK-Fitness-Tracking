@@ -97,6 +97,12 @@ Why things are the way they are. Read before "fixing" something that looks odd.
   or more with recovery after other days, using the *next* day's recovery because sleep belongs to the
   wake-up day; it needs 3 hard and 3 other days in the last 28. The change line compares with the 14 days before
   and needs 7 recovery days there.
+- **Day timeline opens at last night's bedtime.** Sleep belongs to the day you woke up, so the window for a
+  day starts at the hour you fell asleep the night before (never more than 6 hours before midnight) and runs
+  to midnight, or to now for today. Tonight's sleep is drawn clipped at midnight. Heart rate and Body Battery
+  are two aligned charts, never a dual axis. Sleep stages are not drawn: the Sleep page has them, and four
+  stage hues plus the other three would exceed four hues. There is no stress curve because Garmin does not
+  send one to Personal API keys.
 
 ## UI
 

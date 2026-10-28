@@ -8,8 +8,10 @@ import { recoverySeries } from '../lib/homeLogic'
 import { effortSeries } from '../lib/effort'
 import { MIN_PAIRED, resilienceFor, resilienceSeries, stateInfo } from '../lib/resilience'
 import { MIN_NIGHTS, healthMonitor } from '../lib/health'
+import { dayTimeline, defaultTimelineDay } from '../lib/timeline'
 import { usePrefs } from '../lib/prefs'
 import Sparkline from '../charts/Sparkline'
+import { dayLabel } from '../components/DateStepper'
 import Badge from '../components/Badge'
 import Icon from '../components/Icon'
 import Empty from '../components/Empty'
@@ -31,13 +33,22 @@ const REPORTS = [
   { id: 'rec', title: 'Recovery', icon: 'battery', hue: 'readiness', to: '#/reports/recovery', desc: 'Recovery estimate, sleep, HRV and Body Battery together', custom: 'rec', label: 'avg recovery' },
   { id: 'res', title: 'Resilience', icon: 'scale', hue: 'readiness', to: '#/reports/resilience', desc: 'Whether recovery is keeping up with your effort', custom: 'res' },
   { id: 'health', title: 'Health monitor', icon: 'shield', hue: 'heart', to: '#/reports/health', desc: 'Resting HR, HRV and breathing against your normal range', custom: 'health' },
+  { id: 'day', title: 'Day timeline', icon: 'clock', hue: 'heart', to: '#/reports/timeline', desc: 'Sleep, workouts, heart rate and Body Battery through one day', custom: 'day' },
 ]
 
 function useCards() {
   const days = useStore(s => s.days), acts = useStore(s => s.activities), { sleepNeedHours } = usePrefs()
   return useMemo(() => REPORTS.map(r => {
     let series = [], value = null, sub = r.label, vitals, emptyText
-    if (r.custom === 'health') {
+    if (r.custom === 'day') {
+      const d = defaultTimelineDay(days, today())
+      if (d) {
+        const x = dayTimeline(days, acts, d), lbl = dayLabel(d)
+        value = x.stats.hrMin != null ? `${x.stats.hrMin}–${x.stats.hrMax}` : null
+        sub = `bpm, ${lbl === 'Today' || lbl === 'Yesterday' ? lbl.toLowerCase() : lbl}`
+        series = x.hr.map(p => ({ date: p.ts, value: p.v }))
+      } else emptyText = 'Needs detailed readings from a recent sync'
+    } else if (r.custom === 'health') {
       const m = healthMonitor(days, today())
       value = m.total ? `${m.total - m.outside} of ${m.total}` : null; sub = 'vitals in your normal range'; vitals = m.vitals
       if (m.pending.some(x => x.reason === 'no-range')) emptyText = `Range builds after ${MIN_NIGHTS} nights`
