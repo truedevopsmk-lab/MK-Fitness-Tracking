@@ -61,6 +61,21 @@ is `unavailable` (not offered) or `empty`, and record the result here.
 - **Activities**: `activityId` (number) → `id` string; `startTimeGMT` (UTC, no `Z`) → `startTs`;
   HR zones in `hrTimeInZone_1…5`; load in `activityTrainingLoad`.
 
+## Capability check (Sync Center)
+
+Garmin doesn't document which endpoints a Personal API key may call. Sync Center → **Garmin
+capabilities** → "Run check" calls each candidate in `src/sync/probe.js` once (~38 requests, under a
+minute) and shows Available / No data yet / Not available (401/403/404) / Error per endpoint.
+**Copy report** gives a text summary with URL templates, HTTP status and field names/types only —
+safe to paste into an issue or a chat. Record findings below and promote useful endpoints into
+`endpoints.js` (with a normaliser and a fixture) rather than calling them from pages.
+
+### Findings
+
+_Not yet run against the owner's key._ Paste the report summary here after the first run: which
+Check-items in `ROADMAP.md` (sleep sub-scores and need, readiness, respiration, SpO₂, training
+status, VO₂ max, race predictions, splits, HR zones, strength sets, gear) are available.
+
 ## Rate limits
 
 Garmin returns **429** when called too fast. The engine runs requests sequentially (250 ms gap),

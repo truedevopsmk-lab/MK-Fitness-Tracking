@@ -11,13 +11,44 @@ Ideas, known gaps and tech debt. Move items to "Done" (with the PR) as they land
 - [ ] **Sleep need setting default.** `prefs.sleepNeedHours` (8) drives sleep debt and the recovery
   cap when Garmin sends no need — surface it more clearly (Settings → Profile?).
 - [ ] **Verify experimental endpoints** (`userSummary`, `intensity`, `heartRate`) with a real key and
-  promote or drop them.
+  promote or drop them — the capability check below covers this.
+
+## Coaching plan (agreed 2026-10-28)
+
+Inspired by Bevel, WHOOP, Oura, Athlytic and Garmin Connect, built in this order. Each phase ships
+with tests, screenshots in every theme and an updated doc, and is deployed when done. Data source
+per item: **Have** = already synced, **Check** = depends on the capability check, **Log** = entered
+by the user and kept on the device.
+
+- [x] **Garmin capability check** — Sync Center tool that calls candidate endpoints once and reports
+  status + field names only. Results go into `GARMIN-API.md` and decide which **Check** items happen.
+  - [ ] Run it on the owner's key and record the findings.
+- **Phase 1 · Daily coach**
+  - [ ] A2 Recovery breakdown — what moved today's recovery (sleep, HRV, RHR, respiration) (Have)
+  - [ ] A3 Health monitor — RHR / HRV / respiration / SpO₂ against the 30-day normal range (Have)
+  - [ ] A5 Garmin sleep sub-scores — duration, quality, recovery, restlessness (Check)
+  - [ ] A4 Sleep coach — 7-day sleep bank, tonight's need, bedtime planner from a wake time (Have)
+  - [ ] A1 Effort score + daily target — strain-like 0–100 from training load and steps, target from recovery (Have)
+  - [ ] A6 Resilience — 14-day recovery vs strain balance (Have)
+  - [ ] A7 Day timeline — sleep, activities, stress and Body Battery on one line (Have/Check)
+- **Phase 2 · Journal** (Log; never leaves the device)
+  - [ ] B1 Daily tags (alcohol, late meal, caffeine, travel, …) with a quick morning check-in
+  - [ ] B2 Habit impact — ≥ 5 days with and ≥ 5 without before showing a difference, with sample sizes
+  - [ ] B3 Day status — sick / injured / travelling / break, excluded from baselines
+  - [ ] B4 Counters — water, caffeine, alcohol
+- **Phase 3 · Training**
+  - [ ] C1 Fitness / fatigue / form (Have) · C2 Training status from it (Have) · C3 Intensity mix 80/20 (Have)
+  - [ ] C4 Personal records from synced activities (Have) · C7 Race predictor (Have/Check)
+  - [ ] C5 Splits + route map · C6 VO₂ max + fitness age · C8 Strength sets (Check) · C9 Gear mileage (Log/Check)
+- **Phase 4 · Reviews**
+  - [ ] D1 Weekly review · D2 Goals + streaks · D3 Calendar heatmaps · D7 Share card
+  - [ ] D4 Year in review · D5 Compare periods · D6 Correlation explorer · D8 Customise Today
+- **Undecided:** E1 "Copy for AI" anonymised summary · E2 in-app chat with your own LLM key (would send
+  data off the device, so opt-in only). Ask the owner before building.
+- **Not planned:** smart alarm, widgets and push (iOS PWA limits), nutrition logging, blood work.
 
 ## Features
 
-- [ ] Activity detail: per-km splits (pace/HR) and a route map (one extra request per activity, on open).
-- [ ] Weekly summary card on Today (this week vs last: sleep, steps, training time, RHR).
-- [ ] User-defined goals (steps, sleep, intensity) with streaks.
 - [ ] Morning check reachable from the iPhone home screen (iOS ignores manifest shortcuts — needs an
   Apple Shortcuts recipe or a separate bookmark to `#/morning`).
 - [ ] Notifications/reminders (limited on iOS PWAs — investigate Web Push support).

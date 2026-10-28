@@ -37,6 +37,7 @@ src/
     garmin.js            HTTP client: token exchange, session, request(), GarminError
     endpoints.js         registry of Garmin endpoints (path, kind, chunking, normalize)
     engine.js            sync orchestrator: plan → run sequentially → merge → status
+    probe.js             Garmin capability check (Sync Center): status + field names only
   data/
     schema.js            JSDoc typedefs of the normalised data model (the contract)
     normalize.js         Garmin JSON → schema shapes (defensive; never throws)
@@ -160,6 +161,19 @@ for empty bodies, or throws `GarminError { status, kind, retryAfterMs }` where `
 records, failedRanges, coverage }` with `status` ∈ `idle | queued | running | ok | empty | partial |
 failed | unavailable | cancelled`. `empty` = Garmin answered with no data ("Garmin has no data for this
 yet"); `unavailable` = not offered to this API key (skipped on incremental syncs, retried on full).
+
+**`probe.js`** — the capability check behind Sync Center → "What your Garmin key allows". `PROBES`
+lists candidate endpoints (URL templates with `{date}`, `{weekAgo}`, `{monthAgo}`, `{displayName}`,
+`{profileId}`, `{activityId}`); `runProbes()` calls each once, sequentially (400 ms gap, one 429
+retry, stops after 3 rate limits or a session 401), and keeps per probe only `{ status, http, ms,
+shape, extra, note }` with `status` ∈ `ok | empty | unavailable | error | limited | skipped`.
+`shapeOf()` reduces JSON to field names and types (`{sleepScores:{overall:{value:num}}}`), redacting
+keys that look like dates, numbers, UUIDs or emails. Template values captured along the way
+(display name, profile number, activity ID) live only in the run's `ctx` and never reach results,
+notes or the report; error notes are fixed copy because `GarminError.message` can embed the filled
+path. `buildReport()` prints templates, not filled paths. Its own tiny store (`probeState`,
+`subscribeProbe`, `startProbe`, `cancelProbe`) is in memory only — nothing is persisted.
+Tests: `scripts/test-probe.mjs` (includes sentinel checks that captured values never leak).
 
 ## Routing (`src/router.js`, `src/App.jsx`)
 

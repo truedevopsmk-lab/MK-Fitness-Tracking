@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useStore, actions } from '../state/store'
 import { usePrefs } from '../lib/prefs'
 import { fmtAgo, fmtDateTime, fmtDay, fmtNumber } from '../lib/format'
@@ -6,6 +6,8 @@ import { today } from '../lib/dates'
 import { ENDPOINTS } from '../sync/endpoints'
 import { cancelSync, estimateFullSync, retryEndpoint, retryFailed, startSync } from '../sync/engine'
 import { isSessionValid, session, signOut } from '../sync/garmin'
+import { PROBES, PROBE_GROUPS, buildReport, cancelProbe, probeState, startProbe, subscribeProbe } from '../sync/probe'
+import { toast } from '../components/toast'
 import Badge from '../components/Badge'
 import Button from '../components/Button'
 import Card from '../components/Card'
@@ -30,6 +32,11 @@ const STATUS = {
 }
 const RESULT = { ok: ['good', 'Succeeded'], partial: ['warning', 'Partly succeeded'], failed: ['critical', 'Failed'], cancelled: ['warning', 'Cancelled'] }
 const GROUP_ORDER = ['Account', 'Training', 'Activity', 'Sleep', 'Recovery', 'Heart', 'Body']
+
+const PROBE_BADGE = {
+  ok: ['good', 'Available'], empty: ['neutral', 'No data yet'], unavailable: ['neutral', 'Not available'],
+  error: ['critical', 'Error'], limited: ['warning', 'Rate limited'], skipped: ['neutral', 'Skipped'],
+}
 
 const clock = secs => { const s = Math.max(0, Math.round(secs)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
 
@@ -72,6 +79,77 @@ function EndpointRow({ ep, st, busy, canSync, onRetry }) {
   </li>
 }
 
+function ProbeRow({ probe, r, checking }) {
+  const [tone, label] = PROBE_BADGE[r?.status] || []
+  return <li className="sync-ep probe-row">
+    <div className="sync-ep-main">
+      <div className="sync-ep-title"><span className="sync-ep-name">{probe.label}</span></div>
+      <div className="probe-unlocks">{probe.unlocks}</div>
+      {r?.note && r.status !== 'unavailable' && <p className={`sync-ep-note ${r.status === 'error' ? 'is-error' : ''}`}>{r.note}</p>}
+    </div>
+    <div className="sync-ep-side">
+      {r ? <><Badge tone={tone}>{label}</Badge>{r.http != null && r.status !== 'ok' && <span className="probe-http">HTTP {r.http}</span>}</>
+        : checking ? <Badge tone="accent" icon={false}><span className="spinner" aria-hidden="true" />Checking</Badge>
+        : <span className="sync-sub">Waiting</span>}
+    </div>
+    {r && <details className="probe-fields">
+      <summary>Details</summary>
+      <div className="probe-path">{probe.url}</div>
+      {r.shape && <pre>{r.shape}{r.extra?.length ? `\n\nMetrics: ${r.extra.join(', ')}` : ''}</pre>}
+    </details>}
+  </li>
+}
+
+function ProbeCard({ canSync, syncing, now }) {
+  const st = useSyncExternalStore(subscribeProbe, probeState)
+  const profile = useStore(s => s.profile), activities = useStore(s => s.activities)
+  const [text, setText] = useState(null)
+  const list = Object.values(st.results), started = st.running || list.length > 0
+  const count = (...k) => list.filter(r => k.includes(r.status)).length
+  const wait = st.waitUntil && st.waitUntil > now ? Math.ceil((st.waitUntil - now) / 1000) : null
+  const next = st.running ? PROBES.find(p => !st.results[p.id])?.id : null
+  const start = () => { setText(null); startProbe({ displayName: profile?.displayName, activityId: activities.find(a => /^\d+$/.test(String(a.id)))?.id }) }
+  const copy = async () => {
+    const report = buildReport(list)
+    try {
+      await navigator.clipboard.writeText(report)
+      setText(null); toast('Report copied', { tone: 'good' })
+    } catch {
+      setText(report); toast('Select the text and copy it', { tone: 'neutral' })
+    }
+  }
+  return <Card title="What your Garmin key allows" subtitle="Check which extra Garmin data this app could use">
+    <p className="muted sync-p">Calls each endpoint once — about {PROBES.length} requests, under a minute. Only status codes and field names are kept, never your values, and nothing is saved or sent anywhere.</p>
+    <div className="sync-actions">
+      {!st.running && <Button variant="primary" size="lg" icon="refresh" disabled={!canSync || syncing} onClick={start}>{list.length ? 'Run again' : 'Run check'}</Button>}
+      {!st.running && list.length > 0 && <Button variant="secondary" size="lg" icon="copy" onClick={copy}>Copy report</Button>}
+      {st.running && <Button variant="danger" size="lg" icon="x" onClick={cancelProbe}>Cancel</Button>}
+    </div>
+    {!canSync && <p className="sync-hint">Reconnect Garmin above to run the check.</p>}
+    {syncing && !st.running && <p className="sync-hint">Wait for the sync to finish.</p>}
+    {st.running && <div className="sync-progress" role="status" aria-live="polite">
+      <Meter value={st.done} max={Math.max(st.total, 1)} hue="steps" label="Checking endpoints" valueLabel={`${st.done} / ${st.total}`} />
+      {wait != null && <p className="sync-rate"><Icon name="alert" size={16} />Garmin asked us to slow down — resuming in {wait} s</p>}
+    </div>}
+    {st.error && <p className="sync-error" role="alert"><Icon name="alert" size={16} />{st.error}</p>}
+    {st.cancelled && <p className="sync-hint">Check cancelled — results so far are below.</p>}
+    {text && <textarea className="probe-report" rows={8} readOnly value={text} onFocus={e => e.target.select()} aria-label="Report" />}
+    {list.length > 0 && <div className="probe-summary">
+      {[['Available', count('ok')], ['No data', count('empty')], ['Unavailable', count('unavailable')], ['Other', count('error', 'limited', 'skipped')]].map(([l, n]) =>
+        <div key={l}><span className="num">{n}</span><span className="sync-eyebrow">{l}</span></div>)}
+    </div>}
+    {started && <div className="probe-groups">
+      {PROBE_GROUPS.map(g => {
+        const probes = PROBES.filter(p => p.group === g)
+        return <details key={g} className="probe-group" open={g !== 'In the app'}>
+          <summary><span>{g}</span><span className="probe-group-count">{probes.filter(p => st.results[p.id]?.status === 'ok').length} of {probes.length} available</span></summary>
+          <ul className="sync-eps">{probes.map(p => <ProbeRow key={p.id} probe={p} r={st.results[p.id]} checking={next === p.id} />)}</ul>
+        </details>
+      })}
+    </div>}
+  </Card>
+}
+
 export default function SyncCenter() {
   const source = useStore(s => s.source), syncMeta = useStore(s => s.syncMeta), endpoints = useStore(s => s.endpoints)
   const sync = useStore(s => s.sync), log = useStore(s => s.log), days = useStore(s => s.days)
@@ -80,7 +158,8 @@ export default function SyncCenter() {
   const [confirm, setConfirm] = useState(null) // 'full' | 'signout'
   const [showLog, setShowLog] = useState(false)
   const demo = source === 'demo', running = sync.running
-  const now = useNow(running || sync.rateLimitedUntil != null)
+  const probing = useSyncExternalStore(subscribeProbe, probeState).running
+  const now = useNow(running || probing || sync.rateLimitedUntil != null)
   const valid = isSessionValid(), hasSession = !!session()?.accessToken
   const canSync = !demo && valid
 
@@ -120,9 +199,9 @@ export default function SyncCenter() {
     </Card> : <>
       <Card className="sync-actions-card">
         <div className="sync-actions">
-          <Button variant="primary" size="lg" icon="refresh" disabled={running || !canSync} onClick={() => run(() => startSync('incremental'))}>Sync latest</Button>
-          <Button variant="secondary" size="lg" icon="download" disabled={running || !canSync} onClick={() => setConfirm('full')}>Full sync</Button>
-          {failed.length > 0 && !running && <Button variant="secondary" size="lg" icon="alert" disabled={!canSync} onClick={() => run(retryFailed)}>Retry failed ({failed.length})</Button>}
+          <Button variant="primary" size="lg" icon="refresh" disabled={running || probing || !canSync} onClick={() => run(() => startSync('incremental'))}>Sync latest</Button>
+          <Button variant="secondary" size="lg" icon="download" disabled={running || probing || !canSync} onClick={() => setConfirm('full')}>Full sync</Button>
+          {failed.length > 0 && !running && <Button variant="secondary" size="lg" icon="alert" disabled={!canSync || probing} onClick={() => run(retryFailed)}>Retry failed ({failed.length})</Button>}
           {running && <Button variant="danger" size="lg" icon="x" onClick={cancelSync}>Cancel</Button>}
         </div>
         {!canSync && <p className="sync-hint">Reconnect Garmin below to sync.</p>}
@@ -152,9 +231,14 @@ export default function SyncCenter() {
     <SectionTitle>Data sources</SectionTitle>
     <div className="sync-groups">
       {grouped.map(([group, list]) => <Card key={group} title={group} flush className="sync-group">
-        <ul className="sync-eps">{list.map(ep => <EndpointRow key={ep.id} ep={ep} st={endpoints[ep.id] || { status: 'idle' }} busy={running} canSync={canSync} onRetry={id => run(() => retryEndpoint(id))} />)}</ul>
+        <ul className="sync-eps">{list.map(ep => <EndpointRow key={ep.id} ep={ep} st={endpoints[ep.id] || { status: 'idle' }} busy={running || probing} canSync={canSync} onRetry={id => run(() => retryEndpoint(id))} />)}</ul>
       </Card>)}
     </div>
+
+    {!demo && <>
+      <SectionTitle>Garmin capabilities</SectionTitle>
+      <ProbeCard canSync={canSync} syncing={running} now={now} />
+    </>}
 
     <Card title="Sync log" subtitle={`${log.length} entries`} action={<Button size="sm" variant="ghost" icon="chevron-down" aria-expanded={showLog} onClick={() => setShowLog(v => !v)}>{showLog ? 'Hide' : 'Show'}</Button>}>
       {showLog && (logLines.length ? <ol className="sync-log">{logLines.map((l, i) => <li key={i} className={`sync-log-${l.level}`}><time className="num">{new Date(l.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time><span>{l.msg}</span></li>)}</ol> : <p className="muted sync-p">Nothing logged yet.</p>)}
