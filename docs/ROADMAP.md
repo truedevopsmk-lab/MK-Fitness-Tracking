@@ -22,7 +22,7 @@ by the user and kept on the device.
   status + field names only. Results go into `GARMIN-API.md` and decide which **Check** items happen.
   - [x] Run it on the owner's key and record the findings (`GARMIN-API.md § Findings`, 2026-10-28).
 - **Phase 1 · Daily coach**
-  - [ ] A2 Recovery breakdown — what moved today's recovery (sleep, HRV, RHR, respiration) (Have)
+  - [x] A2 Recovery breakdown — what moved today's recovery (sleep, HRV, RHR, respiration) (Have)
   - [ ] A3 Health monitor — RHR / HRV / respiration against the 30-day normal range; SpO₂ only if present (Have)
   - [ ] A5 Garmin sleep sub-scores — duration, stress, awakenings, restlessness, stage mix (Have — in sleep summaries)
   - [ ] A4 Sleep coach — 7-day sleep bank, tonight's need, bedtime planner from a wake time (Have)
@@ -80,3 +80,6 @@ by the user and kept on the device.
 - v2 overhaul — Sync Center, Today/Morning, trends, sleep, reports, insights, settings, lock, PWA (`fe7488f`).
 - Greeting name: ignore Garmin UUIDs + local name setting; recovery estimate short-night cap (`de053da`).
 - Garmin capability check in Sync Center (`e03dbf9`).
+- Capability findings → richer sleep/daily data, one recovery score (`4cc02cf`).
+- A2 Recovery breakdown: "What moved it" card on the Recovery report (any day via `?date=`),
+  linked from Today and Morning; overnight respiration added to the registry.

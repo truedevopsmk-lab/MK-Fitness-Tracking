@@ -51,7 +51,7 @@ export default function Morning() {
         <div className="morning-big num">{bbNow ?? '—'}</div>
         {bbBand && <Badge tone={bbBand.tone}>{bbBand.label}</Badge>}
       </Card>
-      <Card className="morning-card" href="#/" style={hueStyle('readiness')}>
+      <Card className="morning-card" href="#/reports/recovery" style={hueStyle('readiness')}>
         <span className="morning-label"><i className="tile-dot" aria-hidden="true" />{rec.kind === 'garmin' ? 'Readiness' : 'Recovery'}</span>
         <div className="morning-row"><Ring value={rec.score} hue="readiness" size={64} thickness={8} /></div>
         {rec.kind === 'estimate' && <span className="tile-sub">Estimate</span>}

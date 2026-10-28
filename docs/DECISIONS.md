@@ -45,6 +45,12 @@ Why things are the way they are. Read before "fixing" something that looks odd.
   after a short night** (> 1 h under need → max 70, > 2.5 h → max 55), as Garmin's readiness is.
   Need is Garmin's sleep need when present, else Settings → Sleep need. Today, Morning, the Reports
   tile and the Recovery report all use `recoveryFor` / `recoverySeries`, so they show the same number.
+- **Recovery breakdown shares the model.** `recoveryBreakdown` and `recoveryFor` both call the
+  private `recoveryModel`, so "What moved it" can never disagree with the hero. Resting HR and
+  respiration appear as **context, not inputs**: they aren't in the score, and adding them would
+  change every number users have seen. HRV points top out at 85 so the card never implies that
+  HRV above your usual is extra recovery. Respiration is the overnight (sleep) value only; waking
+  respiration moves with activity and isn't comparable night to night.
 - **Delta noise floor.** Day-to-day changes like "−0.4" are noise; `isMeaningfulDelta()` turns them
   into "Same". Thresholds per metric in `MIN_DELTA` (`lib/metrics.js`).
 - **Insights are trends with sample sizes**, never causal or medical claims, and stay silent below

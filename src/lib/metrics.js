@@ -37,6 +37,7 @@ export const METRICS = {
   deepSleep:     { label: 'Deep sleep', short: 'Deep', unit: 'h', pick: d => d.sleep?.deepSec, format: fmtDuration, axis: hours, agg: 'mean', better: 'up', hue: 'sleep', group: 'Sleep', report: 'sleep' },
   remSleep:      { label: 'REM sleep', short: 'REM', unit: 'h', pick: d => d.sleep?.remSec, format: fmtDuration, axis: hours, agg: 'mean', better: 'up', hue: 'sleep', group: 'Sleep', report: 'sleep' },
   awakeTime:     { label: 'Awake time', short: 'Awake', unit: 'h', pick: d => d.sleep?.awakeSec, format: fmtDuration, axis: hours, agg: 'mean', better: 'down', hue: 'sleep', group: 'Sleep', report: 'sleep' },
+  respiration:   { label: 'Overnight respiration', short: 'Breathing', unit: 'br/min', pick: d => d.sleep?.avgRespiration, format: v => v == null ? '—' : `${fmtNumber(v, 1)} br/min`, axis: v => fmtNumber(v, Number.isInteger(v) ? 0 : 1), agg: 'mean', better: null, hue: 'sleep', group: 'Sleep', report: 'sleep' },
 
   bodyBatteryHigh: { label: 'Body Battery high', short: 'BB high', unit: '', pick: d => d.bodyBattery?.high, format: n0, agg: 'mean', better: 'up', hue: 'battery', domain: [0, 100], band: bbBand, group: 'Body Battery', report: 'body-battery' },
   bodyBatteryLow:  { label: 'Body Battery low', short: 'BB low', unit: '', pick: d => d.bodyBattery?.low, format: n0, agg: 'mean', better: 'up', hue: 'battery', domain: [0, 100], band: bbBand, group: 'Body Battery', report: 'body-battery' },
@@ -69,7 +70,7 @@ export function valueOf(key, day) {
 }
 
 /** Smallest change worth showing as a delta chip (below this it is day-to-day noise). */
-const MIN_DELTA = { sleepScore: 2, stressAvg: 2, bodyBatteryHigh: 3, bodyBatteryLow: 3, bodyBatteryCharged: 3, bodyBatteryDrained: 3, hrv: 2, hrvWeekly: 1, restingHr: 1, steps: 300, readiness: 3, intensity: 5, trainingLoad: 5, weight: 0.2 }
+const MIN_DELTA = { sleepScore: 2, stressAvg: 2, bodyBatteryHigh: 3, bodyBatteryLow: 3, bodyBatteryCharged: 3, bodyBatteryDrained: 3, hrv: 2, hrvWeekly: 1, restingHr: 1, steps: 300, readiness: 3, intensity: 5, trainingLoad: 5, weight: 0.2, respiration: 0.5 }
 export function isMeaningfulDelta(key, delta) {
   if (delta == null || !Number.isFinite(delta)) return false
   const unitMin = METRICS[key]?.unit === 'h' ? 300 : 1 // 5 min for durations

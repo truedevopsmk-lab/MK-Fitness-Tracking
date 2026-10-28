@@ -114,8 +114,11 @@ export default function Today() {
           {rec.parts.length > 0 && <div className="home-chips">{rec.parts.map(p => <Badge key={p.key} tone={p.tone}>{p.text}</Badge>)}</div>}
         </div>
       </div>
-      {rec.kind === 'estimate' && <p className="home-note">Estimate from sleep, HRV and Body Battery. It is not a Garmin number.</p>}
-      {rec.score == null && <p className="home-note">Needs at least two of sleep score, HRV and Body Battery from the last few days.</p>}
+      <div className="home-hero-foot">
+        {rec.kind === 'estimate' && <p className="home-note">Estimate from sleep, HRV and Body Battery. It is not a Garmin number.</p>}
+        {rec.score == null && <p className="home-note">Needs at least two of sleep score, HRV and Body Battery from the last few days.</p>}
+        {rec.score != null && <a className="home-hero-link" href="#/reports/recovery"><span>What moved it</span><Icon name="chevron-right" size={18} /></a>}
+      </div>
     </Card>
 
     <div className="home-tiles">

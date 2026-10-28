@@ -177,7 +177,7 @@ export function StackedColumns({ data, series, unit = 1, format = v => fmtNumber
   </div>
 }
 
-export default function ReportLayout({ title, icon = 'reports', hue = 'steps', subtitle, range, onRange, ranges = RANGES, summary = [], csv, hasData = true, emptyBody, missing, asOf, children }) {
+export default function ReportLayout({ title, icon = 'reports', hue = 'steps', subtitle, range, onRange, ranges = RANGES, summary = [], csv, hasData = true, emptyBody, missing, asOf, lead, children }) {
   const exportCsv = useMemo(() => csv && (() => {
     try {
       const { filename, rows, columns } = csv()
@@ -191,6 +191,7 @@ export default function ReportLayout({ title, icon = 'reports', hue = 'steps', s
     {!hasData
       ? <Card><Empty icon={icon} title={`No ${title.toLowerCase()} data yet`} body={emptyBody || 'Sync your Garmin data, or explore with demo data, and this report fills in.'} action={<Button variant="primary" href="#/sync">Open Sync Center</Button>} /></Card>
       : <>
+        {lead}
         <div className="rp-filter">
           <RangeTabs value={range} onChange={onRange} options={ranges} />
           {(asOf || missing?.missing > 0) && <div className="rp-filter-meta">{asOf && <span className="rp-asof">{asOf}</span>}{missing && <MissingNote {...missing} />}</div>}

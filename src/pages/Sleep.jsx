@@ -306,7 +306,7 @@ export default function Sleep() {
       <div className="grid sl-grid">
         {num(restingHr) && <StatTile metricKey="restingHr" value={restingHr} label="Resting HR" sub={num(sleep.restingHr) ? 'During sleep' : 'Daily resting HR'} />}
         {num(avgHrv) && <StatTile metricKey="hrv" value={avgHrv} label="Overnight HRV" delta={num(hrvWeekly) && Math.abs(avgHrv - hrvWeekly) >= 1 ? avgHrv - hrvWeekly : undefined} sub={num(hrvWeekly) ? `7-day avg ${hrvWeekly} ms` : 'No 7-day average yet'} band={false} />}
-        {num(sleep.avgRespiration) && <StatTile metricKey="sleepScore" band={false} label="Respiration" value={fmtNumber(sleep.avgRespiration, 1)} unit="br/min" sub="Average overnight" />}
+        {num(sleep.avgRespiration) && <StatTile metricKey="respiration" value={sleep.avgRespiration} label="Respiration" sub="Average overnight" />}
         {num(sleep.avgSpo2) && <StatTile metricKey="sleepScore" band={false} label="Blood oxygen" value={`${fmtNumber(sleep.avgSpo2)}%`} sub="Average SpO2" />}
         {num(bbGain) && <StatTile metricKey="bodyBatteryCharged" value={bbGain} label="Body Battery gained" sub="Overnight" band={false} />}
       </div>

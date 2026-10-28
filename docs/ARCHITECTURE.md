@@ -53,7 +53,7 @@ src/
     stats.js             mean, bucketing, summaries, rolling baseline, correlation
     metrics.js           METRIC REGISTRY + sleep-stage / stress-level palettes + delta rules
     insights.js          personal insight detectors
-    homeLogic.js         Today/Morning logic (recovery estimate, week grid, deltas)
+    homeLogic.js         Today/Morning logic (recovery estimate + breakdown, week grid, deltas)
     activities.js        activity helpers (type groups, pace, training effect, load)
     name.js              greeting-name resolution (local override, ignores Garmin UUIDs)
     prefs.js             UI preferences in localStorage + usePrefs()
@@ -189,7 +189,7 @@ Hash routes (work on static hosting): `useRoute()` → `{ path, segments, params
 | `#/morning` | `pages/Morning.jsx` |
 | `#/trends`, `#/trends/:metric?range=&g=&end=` | `pages/Trends.jsx`, `pages/TrendDetail.jsx` |
 | `#/sleep?date=&range=` | `pages/Sleep.jsx` (`#/reports/sleep` redirects here) |
-| `#/reports`, `#/reports/:kind?range=` | `pages/Reports.jsx`, `pages/reports/*` (map in `App.jsx` `REPORTS`) |
+| `#/reports`, `#/reports/:kind?range=` (recovery also `&date=`) | `pages/Reports.jsx`, `pages/reports/*` (map in `App.jsx` `REPORTS`) |
 | `#/activities`, `#/activities/:id` | `pages/Activities.jsx`, `pages/ActivityDetail.jsx` |
 | `#/insights` | `pages/Insights.jsx` |
 | `#/sync` | `pages/SyncCenter.jsx` |

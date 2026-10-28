@@ -8,8 +8,8 @@ export function fmtDelta(metricKey, delta) {
   if (delta == null || !Number.isFinite(delta)) return '—'
   const m = METRICS[metricKey], sign = delta > 0 ? '+' : delta < 0 ? '−' : '', abs = Math.abs(delta)
   if (m?.unit === 'h') return `${sign}${fmtDuration(abs)}`
-  const digits = m?.unit === 'kg' && abs < 10 && !Number.isInteger(abs) ? 1 : 0
-  const unit = ['ms', 'bpm', 'min', 'kg'].includes(m?.unit) ? ` ${m.unit}` : ''
+  const digits = m?.unit === 'br/min' ? 1 : m?.unit === 'kg' && abs < 10 && !Number.isInteger(abs) ? 1 : 0
+  const unit = ['ms', 'bpm', 'min', 'kg', 'br/min'].includes(m?.unit) ? ` ${m.unit}` : ''
   return `${sign}${fmtNumber(abs, digits)}${unit}`
 }
 

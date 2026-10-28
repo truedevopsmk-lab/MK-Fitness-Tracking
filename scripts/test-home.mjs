@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { recoveryFor, recoverySeries, weekGrid, intensityWeek, deltaVs7, headlineFor, latestActivity } from '../src/lib/homeLogic.js'
+import { recoveryBreakdown, recoveryFor, recoverySeries, weekGrid, intensityWeek, deltaVs7, headlineFor, latestActivity } from '../src/lib/homeLogic.js'
 
 const day = (date, o = {}) => ({ date, ...o })
 const days = {}
@@ -25,4 +25,44 @@ assert.ok(recoveryFor(nd, '2026-10-24', { sleepNeedHours: 9.5 }).score <= 70)
 const rs = recoverySeries(nd, '2026-10-23', '2026-10-25')
 assert.deepEqual(rs.map(p => p.date), ['2026-10-23', '2026-10-24', '2026-10-25'])
 assert.equal(rs[2].value, null); assert.equal(rs[1].value, recoveryFor(nd, '2026-10-24').score)
+// breakdown: same score as recoveryFor, shares and contributions add up
+const sum = (a, f) => a.reduce((t, x) => t + f(x), 0)
+const same = (dd, asOf, o) => { const a = recoveryFor(dd, asOf, o), b = recoveryBreakdown(dd, asOf, o); assert.equal(b.score, a.score); assert.equal(b.kind, a.kind); assert.equal(b.date, a.date); return b }
+let bd = same(nd0(), '2026-10-24')
+function nd0() { const x = JSON.parse(JSON.stringify(days)); delete x['2026-10-24'].readiness; return x }
+assert.equal(bd.kind, 'estimate'); assert.equal(bd.cap, null); assert.equal(bd.score, bd.uncapped)
+assert.deepEqual(bd.factors.map(f => f.key), ['sleep', 'hrv', 'bb'])
+assert.ok(Math.abs(sum(bd.factors, f => f.share) - 1) < 1e-9); assert.equal(Math.round(sum(bd.factors, f => f.contribution)), bd.uncapped)
+assert.ok(bd.factors.every(f => f.band?.label && f.date === '2026-10-24'))
+bd = same(nd, '2026-10-24', { sleepNeedHours: 9.5 })
+assert.ok(bd.cap); assert.equal(bd.cap.limit, 55)
+assert.equal(bd.score, Math.min(bd.uncapped, bd.cap.limit)); assert.ok(bd.uncapped > bd.cap.limit)
+assert.equal(bd.cap.shortSec, bd.cap.needSec - bd.cap.durationSec)
+assert.equal(same(nd, '2026-10-24', { sleepNeedHours: 6.5 }).cap, null)
+assert.equal(bd.factors[0].needSource, 'setting')
+bd = same(days, '2026-10-24'); assert.equal(bd.kind, 'garmin'); assert.equal(bd.factors.length, 3)
+assert.equal(bd.uncapped, null); assert.equal(bd.cap, null); assert.equal(bd.drag, null)
+bd = same({}, '2026-10-24'); assert.deepEqual([bd.score, bd.factors, bd.context, bd.change], [null, [], [], null])
+assert.deepEqual(bd.missing.map(m => m.key), ['sleep', 'hrv', 'bb'])
+// HRV reading without a baseline is listed as not counted
+const nb = { '2026-10-24': day('2026-10-24', { sleep: { score: 80 }, hrv: { lastNight: 60 }, bodyBattery: { high: 70 } }) }
+bd = same(nb, '2026-10-24'); assert.ok(!bd.factors.some(f => f.key === 'hrv')); assert.match(bd.missing.find(m => m.key === 'hrv').reason, /3 nights/)
+// context: Garmin 7-day resting HR when present, else our own mean; respiration needs 3 prior nights
+const cx = nd0(); cx['2026-10-24'].heartRate = { resting: 52, resting7d: 55 }
+let c = recoveryBreakdown(cx, '2026-10-24').context.find(x => x.key === 'restingHr')
+assert.equal(c.source, 'garmin'); assert.equal(c.base, 55); assert.equal(c.delta, -3); assert.equal(c.n, 7)
+delete cx['2026-10-24'].heartRate.resting7d
+c = recoveryBreakdown(cx, '2026-10-24').context.find(x => x.key === 'restingHr')
+assert.equal(c.source, 'own'); assert.equal(c.n, 7); assert.equal(c.base, 54); assert.equal(c.delta, 52 - c.base)
+assert.ok(!recoveryBreakdown(cx, '2026-10-24').context.some(x => x.key === 'respiration'))
+cx['2026-10-24'].sleep.avgRespiration = 15
+for (const n of [23, 22]) cx[`2026-10-${n}`].sleep = { avgRespiration: 14 }
+assert.ok(!recoveryBreakdown(cx, '2026-10-24').context.some(x => x.key === 'respiration'))
+cx['2026-10-21'].sleep = { avgRespiration: 14 }
+c = recoveryBreakdown(cx, '2026-10-24').context.find(x => x.key === 'respiration')
+assert.equal(c.n, 3); assert.equal(c.base, 14); assert.equal(c.delta, 1); assert.equal(c.source, 'own')
+// change vs the previous day
+const cg = nd0(); cg['2026-10-23'] = day('2026-10-23', { sleep: { score: 60 }, hrv: { lastNight: 50, weeklyAvg: 60 }, bodyBattery: { high: 50 } })
+bd = recoveryBreakdown(cg, '2026-10-24'); const pv = recoveryFor(cg, '2026-10-23', { lookbackDays: 0 })
+assert.equal(bd.change.prevScore, pv.score); assert.equal(bd.change.delta, bd.score - pv.score); assert.equal(bd.change.prevDate, '2026-10-23')
 console.log('home tests passed')

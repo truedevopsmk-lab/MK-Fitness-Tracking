@@ -41,4 +41,7 @@ assert.deepEqual(acts.activities.map(x => x.id), ['2', '1']); assert.equal(acts.
 
 assert.equal(f.fmtDuration(27120), '7h 32m'); assert.equal(f.fmtDuration(2520), '42m')
 assert.equal(csv.toCsv([{ a: 'x,y', b: 'q"t' }], [{ key: 'a' }, { key: 'b', label: 'B' }]), 'a,B\r\n"x,y","q""t"')
+const mt = await import(`${root}/src/lib/metrics.js`)
+assert.equal(mt.METRICS.respiration.format(14.23), '14.2 br/min')
+assert.equal(mt.isMeaningfulDelta('respiration', 0.4), false); assert.equal(mt.isMeaningfulDelta('respiration', 0.5), true)
 console.log('lib tests: all passed')

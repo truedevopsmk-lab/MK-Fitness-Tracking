@@ -68,3 +68,21 @@
 .rp-card-val span { font-size: 12.5px; color: var(--text-2); }
 .rp-card .spark { margin-top: 2px; }
 @media (min-width: 640px) and (max-width: 999px) { .rp-grid > :last-child { grid-column: auto / -1; } }
+
+.rb-card .stepper { margin-bottom: 14px; }
+.rb-head { display: flex; align-items: center; gap: 14px; }
+.rb-head-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; align-items: flex-start; }
+.rb-kind { font-size: 13px; color: var(--text-2); }
+.rb-lead { font: 600 16px/1.3 var(--font-display); margin: 0; }
+.rb-factors { list-style: none; margin: 14px 0 0; padding: 0; }
+.rb-factor { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-top: 1px solid var(--border); }
+.rb-factor-top, .rb-factor-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.rb-factor-foot { font-size: 12.5px; color: var(--text-2); }
+.rb-factor-name { display: flex; align-items: center; gap: 8px; font: 600 14px/1.3 var(--font-ui); }
+.rb-factor-name i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.rb-factor-pts { font: 600 18px/1 var(--font-display); }
+.rb-factor.is-missing .rb-factor-name, .rb-factor.is-missing .rb-factor-top > span, .rb-factor.is-missing .rb-factor-foot { color: var(--text-3); }
+.rb-sub { font: 600 13px/1.3 var(--font-ui); color: var(--text-2); margin: 16px 0 2px; }
+.rb-foot { font-size: 12.5px; color: var(--text-3); line-height: 1.45; margin: 12px 0 0; }
+.rb-foot a { color: var(--accent-text); }
+.rb-ctx-val { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
