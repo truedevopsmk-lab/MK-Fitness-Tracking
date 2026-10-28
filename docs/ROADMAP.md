@@ -97,4 +97,4 @@ by the user and kept on the device.
 - A7 Day timeline: `#/reports/timeline?date=` shows sleep, workouts, intraday heart rate and Body Battery
   on one axis with an event list (`e2cda50`).
 - B1 Daily tags: on-device journal of tags (alcohol, late meal, travel, …) in its own IndexedDB store; check-in
-  card on Morning, Journal row on Today, `#/journal?date=`, included in JSON export/import (this PR).
+  card on Morning, Journal row on Today, `#/journal?date=`, included in JSON export/import (`22f769e`).
