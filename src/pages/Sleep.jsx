@@ -1,20 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bar, BarChart, Cell, CartesianGrid, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts'
-import { Badge, Button, Card, DataTable, DateStepper, Empty, Icon, KeyValue, Meter, MissingNote, PageHeader, RangeTabs, Ring, SectionTitle, StatTile } from '../components'
+import { Badge, Button, Card, DataTable, DateStepper, Empty, Icon, KeyValue, Meter, MissingNote, PageHeader, RangeTabs, Ring, SectionTitle, Segmented, StatTile } from '../components'
 import { toast } from '../components/toast'
 import TrendChart from '../charts/TrendChart'
 import { Legend, TipCard, refLabel } from '../charts/ChartParts'
 import { niceTicks, useChartTheme } from '../charts/chartTheme'
 import { useStore } from '../state/store'
-import { usePrefs } from '../lib/prefs'
+import { SLEEP_NEED_OPTIONS, setPrefs, usePrefs } from '../lib/prefs'
 import { useRoute, setParams, href } from '../router'
 import { addDays, daysBetween, today } from '../lib/dates'
 import { fmtClock, fmtDay, fmtDuration, fmtNumber, fmtWeekday } from '../lib/format'
 import { METRICS, SLEEP_STAGES } from '../lib/metrics'
-import { rollingBaseline, summarize } from '../lib/stats'
+import { mean, rollingBaseline, summarize } from '../lib/stats'
 import { dataBounds, latestValue } from '../data/select'
 import { toCsv, downloadFile } from '../lib/csv'
-import { averages, buildRows, clockFromNorm, consistency, needSecFor, recoveryPairs, sleepDebt, stageBreakdown, stageSummary, subScoreRows, subScoreSummary, subScoreTally, timeInBedSec } from './sleepLogic'
+import { BANK_MIN_NIGHTS, PAYBACK_NIGHTS, WAKE_MAX, WAKE_MIN, WAKE_STEP, averages, buildRows, clockFromNorm, consistency, needSecFor, normToClock, recoveryPairs, sleepCoach, stageBreakdown, stageSummary, subScoreRows, subScoreSummary, subScoreTally, timeInBedSec } from './sleepLogic'
 import '../styles/sleep.css'
 
 const num = v => typeof v === 'number' && Number.isFinite(v)
@@ -234,6 +234,75 @@ function RecoveryScatter({ pairs, splitH }) {
   </div>
 }
 
+/* ---------- Sleep coach ---------- */
+function WakeStepper({ coach }) {
+  const { plan, usual, wakeSource } = coach, cur = normToClock(plan.wakeNorm)
+  const step = dir => setPrefs({ wakeTime: Math.min(WAKE_MAX, Math.max(WAKE_MIN, Math.round((cur + dir * WAKE_STEP) / WAKE_STEP) * WAKE_STEP)) })
+  const main = clockFromNorm(plan.wakeNorm)
+  const sub = wakeSource === 'chosen' ? (usual ? `Tap for your usual ${clockFromNorm(usual.norm)}` : 'Your choice')
+    : wakeSource === 'usual' ? `Your usual ${usual.dayType === 'weekend' ? 'weekend ' : usual.dayType === 'weekday' ? 'weekday ' : ''}wake time` : 'Pick your wake time'
+  return <div className="stepper" role="group" aria-label="Wake time">
+    <button type="button" className="stepper-btn" disabled={cur <= WAKE_MIN} onClick={() => step(-1)} aria-label="15 minutes earlier"><Icon name="chevron-left" size={20} /></button>
+    <button type="button" className="stepper-label" disabled={!(wakeSource === 'chosen' && usual)} onClick={() => setPrefs({ wakeTime: null })} aria-label={`Wake time ${main}. ${sub}`}>
+      <span className="stepper-main">{main}</span>
+      <span className="stepper-sub">{sub}</span>
+    </button>
+    <button type="button" className="stepper-btn" disabled={cur >= WAKE_MAX} onClick={() => step(1)} aria-label="15 minutes later"><Icon name="chevron-right" size={20} /></button>
+  </div>
+}
+
+function TonightCard({ coach, prefs }) {
+  const { plan, bank, buffer } = coach
+  if (!plan) return null
+  return <Card className="sl-tonight" title="Tonight" subtitle="A bedtime that covers your sleep need and this week’s sleep bank">
+    <div className="sl-plan">
+      <div className="sl-plan-main">
+        <div className="sl-plan-head">
+          <span className="sl-plan-ico"><Icon name="moon" size={24} /></span>
+          <div>
+            <div className="eyebrow">Bedtime</div>
+            <div className="sl-plan-time num">{clockFromNorm(plan.bedNorm)}</div>
+            <div className="sl-plan-cap">For {fmtDuration(plan.asleepSec)} asleep before a {clockFromNorm(plan.wakeNorm)} wake</div>
+          </div>
+        </div>
+        {plan.late && <p className="sl-callout"><Icon name="moon" size={16} /><span>It’s already past this bedtime. Going to sleep now still leaves about {fmtDuration(plan.leftSec)} asleep before {clockFromNorm(plan.wakeNorm)}.</span></p>}
+        <div className="sl-field"><span className="field-label">Wake time</span><WakeStepper coach={coach} /></div>
+        {coach.needSource === 'setting' && <div className="sl-field">
+          <span className="field-label">Your sleep need</span>
+          <Segmented value={prefs.sleepNeedHours} onChange={sleepNeedHours => setPrefs({ sleepNeedHours })} options={SLEEP_NEED_OPTIONS.map(v => ({ value: v, label: `${v} h` }))} label="Sleep need in hours" />
+        </div>}
+      </div>
+      <div className="sl-plan-calc">
+        <h3 className="sl-sub">How it adds up</h3>
+        <KeyValue rows={[
+          { label: 'Sleep need', hint: coach.needSource === 'garmin' ? 'From Garmin' : 'Your setting', value: fmtDuration(plan.needSec) },
+          { label: 'Sleep bank payback', hint: plan.paybackSec ? `${fmtDuration(bank.net)} behind, spread over ${PAYBACK_NIGHTS} nights` : bank.state === 'ahead' ? 'You’re ahead this week' : bank.state === 'even' ? 'On track this week' : `Needs ${BANK_MIN_NIGHTS} nights in the last 7 · ${bank.nights} so far`, value: plan.paybackSec ? `+${fmtDuration(plan.paybackSec)}` : '0m' },
+          { label: 'Usual time awake', hint: buffer.nights >= 3 ? `Median of ${buffer.nights} nights` : 'Not enough nights yet', value: `+${fmtDuration(plan.bufferSec)}` },
+          { label: 'Time in bed', value: <span className="sl-plan-total num">{fmtDuration(plan.inBedSec)}</span> },
+        ]} />
+        <p className="sl-foot">Bedtime is your wake time minus this total. Garmin starts the night when it detects sleep, so allow the time you usually take to fall asleep. Extra sleep pays back at most 1 h a night.</p>
+      </div>
+    </div>
+  </Card>
+}
+
+function BankCard({ coach }) {
+  const { bank } = coach
+  return <Card title="Sleep bank" subtitle="Last 7 nights against your sleep need">
+    <div className="sl-debt-head">
+      <div className="sl-debt-big num">{!bank.ok ? '—' : bank.state === 'even' ? 'On track' : fmtDuration(Math.abs(bank.net))}</div>
+      <div className="sl-debt-cap">{!bank.ok ? `Needs ${BANK_MIN_NIGHTS} nights · ${bank.nights} so far` : bank.state === 'even' ? 'Your last 7 nights match your sleep need' : bank.state === 'behind' ? 'behind this week' : 'ahead this week'}</div>
+    </div>
+    {bank.nights > 0 && <BalanceChart rows={coach.week} />}
+    <KeyValue rows={bank.nights > 0 ? [
+      { label: 'Nights below need', value: `${bank.below} of ${bank.nights}` },
+      { label: 'Time short of need', value: fmtDuration(bank.deficit) },
+      { label: 'Extra sleep counted', hint: 'Up to 1 h a night', value: fmtDuration(bank.surplus) },
+    ] : [{ label: 'Nights below need', value: '—' }]} />
+    <p className="sl-foot">Bank = time short of your need minus extra sleep on longer nights. Need is Garmin’s sleep need when available, otherwise your setting.</p>
+  </Card>
+}
+
 /* ---------- Page ---------- */
 export default function Sleep() {
   const days = useStore(s => s.days), prefs = usePrefs(), route = useRoute()
@@ -251,9 +320,7 @@ export default function Sleep() {
   const prevRows = useMemo(() => buildRows(days, addDays(end, -(2 * range - 1)), addDays(end, -range), prefs.sleepNeedHours), [days, end, range, prefs.sleepNeedHours])
   const withSleep = rows.filter(r => r.has)
   const missing = rows.length - withSleep.length
-  const weekRows = useMemo(() => buildRows(days, addDays(end, -6), end, prefs.sleepNeedHours), [days, end, prefs.sleepNeedHours])
-  const debt7 = useMemo(() => sleepDebt(weekRows, 7), [weekRows])
-  const debtWin = useMemo(() => sleepDebt(rows, rows.length), [rows])
+  const avgBal = mean(withSleep.map(r => r.balance))
   const cons = useMemo(() => consistency(rows), [rows])
   const rec7 = useMemo(() => recoveryPairs(rows), [rows])
   const avg = useMemo(() => averages(rows), [rows])
@@ -261,6 +328,7 @@ export default function Sleep() {
   const scoreSeries = useMemo(() => rollingBaseline(rows.map(r => ({ date: r.date, value: r.score })), 7), [rows])
   const scoreSummary = useMemo(() => summarize(rows.map(r => ({ value: r.score })), prevRows.map(r => ({ value: r.score }))), [rows, prevRows])
   const needNow = needSecFor(days[end]?.sleep, prefs.sleepNeedHours)
+  const coach = useMemo(() => sleepCoach(days, { prefHours: prefs.sleepNeedHours, wakeClock: prefs.wakeTime }), [days, prefs.sleepNeedHours, prefs.wakeTime])
 
   if (!hasAny) return <div className="page sl-page">
     <PageHeader title="Sleep" subtitle="Nights, stages and sleep habits" />
@@ -318,6 +386,11 @@ export default function Sleep() {
         </dl>
       </Card>
 
+      {date === latest.date && <>
+        <TonightCard coach={coach} prefs={prefs} />
+        <BankCard coach={coach} />
+      </>}
+
       <ScoreFactors sleep={sleep} />
 
       <Card title="Sleep stages" subtitle="Share of the night in each stage">
@@ -368,17 +441,17 @@ export default function Sleep() {
         <DurationChart rows={rows} needSec={needNow} />
       </Card>
 
-      <Card title="Sleep debt" subtitle="How far you are from your sleep need">
+      <Card title="Sleep balance" subtitle="Each night against your sleep need">
         <div className="sl-debt-head">
-          <div className="sl-debt-big num">{debt7.nights < 3 ? '—' : Math.abs(debt7.net) < 900 ? 'On track' : fmtDuration(Math.abs(debt7.net))}</div>
-          <div className="sl-debt-cap">{debt7.nights < 3 ? 'Not enough nights this week' : Math.abs(debt7.net) < 900 ? 'Your last 7 nights match your sleep need' : debt7.net > 0 ? 'behind this week' : 'ahead this week'}</div>
+          <div className="sl-debt-big num">{avgBal == null ? '—' : Math.abs(avgBal) < 300 ? 'On par' : `${avgBal > 0 ? '+' : '−'}${fmtDuration(Math.abs(avgBal))}`}</div>
+          <div className="sl-debt-cap">{avgBal == null ? 'Not enough nights' : Math.abs(avgBal) < 300 ? 'Your nights average your sleep need' : `a night vs your need, on average · ${withSleep.length} nights`}</div>
         </div>
         <BalanceChart rows={rows} />
         <KeyValue rows={[
-          { label: `Over ${range} days`, value: debtWin.nights ? (debtWin.net > 0 ? `${fmtDuration(debtWin.net)} behind` : debtWin.net < 0 ? `${fmtDuration(-debtWin.net)} ahead` : 'Even') : '—' },
           { label: 'Nights below need', value: `${withSleep.filter(r => r.balance < 0).length} of ${withSleep.length}` },
+          { label: 'Nights 1 h or more below', value: `${withSleep.filter(r => r.balance <= -3600).length} of ${withSleep.length}` },
         ]} />
-        <p className="sl-foot">Debt = nights below your need minus surplus from longer nights, with each night's surplus counted up to 1 h. Need is Garmin's sleep need when available, otherwise your setting of {prefs.sleepNeedHours} h.</p>
+        <p className="sl-foot">Need is Garmin’s sleep need when available, otherwise your setting of {prefs.sleepNeedHours} h.</p>
       </Card>
 
       <Card title="Consistency" subtitle="Bedtime and wake time, night by night">

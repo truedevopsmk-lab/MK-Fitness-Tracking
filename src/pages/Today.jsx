@@ -9,6 +9,7 @@ import { latestValue, lastNDays } from '../data/select'
 import { useDisplayName, withName } from '../lib/name'
 import { usePrefs } from '../lib/prefs'
 import { healthMonitor, monitorSummary } from '../lib/health'
+import { bankText, clockFromNorm, sleepCoach } from './sleepLogic'
 import { bodyBatteryNow, deltaVs7, greetingFor, headlineFor, intensityWeek, latestActivity, recoveryFor, weekGrid, whenLabel } from '../lib/homeLogic'
 import { Badge, Button, Card, Empty, Icon, InstallHint, Meter, PageHeader, Ring, SectionTitle, StatTile, toast } from '../components'
 
@@ -70,17 +71,29 @@ function WeekStrip({ days, activities, asOf }) {
   </Card>
 }
 
+function TonightRow({ coach }) {
+  const p = coach.plan, bed = clockFromNorm(p.bedNorm), wake = clockFromNorm(p.wakeNorm)
+  return <a className="home-act home-tonight" href="#/sleep">
+    <span className="home-act-ico"><Icon name="moon" size={22} /></span>
+    <span className="home-act-text"><span className="home-act-label">Tonight</span>
+      <span className="home-act-name">{p.late ? `Past your ${bed} bedtime` : `Bedtime ${bed}`}</span>
+      <span className="home-act-sub">{p.late ? `Going to sleep now leaves about ${fmtDuration(p.leftSec)} before ${wake}` : [`${fmtDuration(p.asleepSec)} asleep before a ${wake} wake`, bankText(coach.bank)].filter(Boolean).join(' · ')}</span></span>
+    <Icon name="chevron-right" size={18} />
+  </a>
+}
+
 export default function Today() {
   const days = useStore(s => s.days)
   const activities = useStore(s => s.activities)
   const profile = useStore(s => s.profile)
   const source = useStore(s => s.source)
-  const asOf = today(), { sleepNeedHours } = usePrefs()
+  const asOf = today(), { sleepNeedHours, wakeTime } = usePrefs()
   useSyncToast()
   const has = Object.keys(days).length > 0 || activities.length > 0
   const rec = useMemo(() => recoveryFor(days, asOf, { sleepNeedHours }), [days, asOf, sleepNeedHours])
   const insights = useMemo(() => { try { return computeInsights(days, activities, { asOf }).slice(0, 2) } catch { return [] } }, [days, activities, asOf])
   const vitals = useMemo(() => { const m = healthMonitor(days, asOf); return { m, s: monitorSummary(m) } }, [days, asOf])
+  const coach = useMemo(() => sleepCoach(days, { prefHours: sleepNeedHours, wakeClock: wakeTime }), [days, asOf, sleepNeedHours, wakeTime])
   const wk = useMemo(() => intensityWeek(days, asOf), [days, asOf])
   const act = useMemo(() => latestActivity(activities), [activities])
   const name = useDisplayName()
@@ -128,6 +141,8 @@ export default function Today() {
       <span className="home-act-text"><span className="home-act-label">Health monitor</span><span className="home-act-name">{vitals.s.title}</span><span className="home-act-sub">{[vitals.s.sub, whenLabel(vitals.m.date, asOf, true)].join(' · ')}</span></span>
       <Icon name="chevron-right" size={18} />
     </a>}
+
+    {coach.has && coach.plan && <TonightRow coach={coach} />}
 
     <div className="home-tiles">
       <Tile days={days} asOf={asOf} metricKey="sleepScore" overnight href="#/sleep" sub={l => fmtDuration(l.record.sleep?.durationSec)} spark={undefined} />

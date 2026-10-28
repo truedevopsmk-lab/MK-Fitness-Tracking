@@ -63,6 +63,15 @@ Why things are the way they are. Read before "fixing" something that looks odd.
   keys, so it shows the rating alone. Stage shares there are of time asleep (Garmin's definition),
   while the Sleep stages card counts time awake too — the card's footnote says so. The trend tally
   appears from 7 rated nights and states the count.
+- **Bedtime = wake − (need + payback + usual time awake).** Garmin's sleep window starts when it
+  detects sleep, so the planner adds the median time spent awake in bed over the last 14 nights
+  (from 3 nights, capped at 90 min). Payback spreads the 7-night bank over 4 nights and is capped
+  at 1 h a night; being ahead never shortens the night below need. The bank, like sleep debt, counts
+  extra sleep only up to 1 h a night and needs 3 nights. The usual wake time is the median of the
+  last 14 nights of the same type (weekday or weekend) when there are 3, else of all nights. Before
+  4 am the plan is for this morning's wake, and the bank is always the 7 nights before the planned
+  wake. "Past this bedtime" (how much sleep is still left) only shows between 6 pm and 4 am, so an
+  early riser at 5 am is never told they are late.
 - **Delta noise floor.** Day-to-day changes like "−0.4" are noise; `isMeaningfulDelta()` turns them
   into "Same". Thresholds per metric in `MIN_DELTA` (`lib/metrics.js`).
 - **Insights are trends with sample sizes**, never causal or medical claims, and stay silent below

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { actions, getState, useStore } from '../state/store'
-import { setPrefs, usePrefs } from '../lib/prefs'
+import { SLEEP_NEED_OPTIONS, setPrefs, usePrefs } from '../lib/prefs'
 import { resolveName } from '../lib/name'
 import { fmtAgo, fmtDay, fmtNumber } from '../lib/format'
 import { today } from '../lib/dates'
@@ -129,7 +129,6 @@ export default function Settings() {
   const doSignOut = () => { signOut(); setConfirm(null); toast('Signed out of Garmin on this device'); location.hash = '#/sync' }
 
   const lastSynced = syncMeta.lastSuccessAt ? fmtAgo(syncMeta.lastSuccessAt) : 'Never'
-  const sleepNeedOpts = [7, 7.5, 8, 8.5, 9]
 
   return <div className="page page-fade settings-page">
     <PageHeader title="Settings" subtitle="Data, appearance, privacy and backups" />
@@ -177,8 +176,8 @@ export default function Settings() {
         <Row title="Sync when I open the app" hint="Fetches new data if the last sync is over 30 minutes old."><Switch checked={!!prefs.autoSync} onChange={autoSync => setPrefs({ autoSync })} label="Sync when I open the app" /></Row>
         <Row title="Full sync history" hint="How far back a full sync reaches for daily summaries." stack><Segmented value={prefs.historyDays} onChange={historyDays => setPrefs({ historyDays })} options={HISTORY} label="History depth" /></Row>
         <Row title="Per-day detail depth" hint="Some data needs one request per day, so deeper means a slower full sync." stack><Segmented value={prefs.perDayDays} onChange={perDayDays => setPrefs({ perDayDays })} options={PERDAY} label="Per-day depth" /></Row>
-        <Row title="Sleep need" hint="Used for sleep debt when Garmin does not provide your sleep need." stack>
-          <Segmented value={prefs.sleepNeedHours} onChange={sleepNeedHours => setPrefs({ sleepNeedHours })} options={sleepNeedOpts.map(v => ({ value: v, label: `${v} h` }))} label="Sleep need in hours" />
+        <Row title="Sleep need" hint="Used for sleep debt, the recovery estimate and tonight’s bedtime when Garmin does not provide your sleep need." stack>
+          <Segmented value={prefs.sleepNeedHours} onChange={sleepNeedHours => setPrefs({ sleepNeedHours })} options={SLEEP_NEED_OPTIONS.map(v => ({ value: v, label: `${v} h` }))} label="Sleep need in hours" />
         </Row>
       </Card>
     </section>

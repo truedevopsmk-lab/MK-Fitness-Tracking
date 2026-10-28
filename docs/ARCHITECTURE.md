@@ -80,7 +80,8 @@ Everything is keyed by **local calendar day** (`'YYYY-MM-DD'`, see `lib/dates.js
   `heartRate.samples` is intraday HR in 10-minute buckets (`[bucketTs, bpm]`, only with ≥ 2 buckets);
   `sleep.subScores` holds Garmin's per-component sleep qualifiers (duration, stress, awakenings,
   restlessness, rem, light, deep), shown on the Sleep page through `pages/sleepLogic.js`
-  (`subScoreRows`, `subScoreSummary`, `subScoreTally`). Demo data mirrors a Personal API key (no
+  (`subScoreRows`, `subScoreSummary`, `subScoreTally`). The sleep coach (`sleepCoach` → bank,
+  usual wake, time-awake buffer, `tonightPlan`) is also there and feeds Sleep and Today. Demo data mirrors a Personal API key (no
   readiness, no SpO2, no sleep-time HR/HRV) except the hypnogram, which is kept so the timeline chart
   stays exercised.
 - **Activity** — normalised activity summary (`id`, `type`, `day`, `startTs`, durations, distance,
@@ -124,7 +125,7 @@ Actions: `init`, `applyDays`, `applyActivities`, `setProfile`, `setSync`, `reset
 | | store `data` | legacy v1 blobs — migrated then cleared by `migrate.js` |
 | IndexedDB `mk-fitness-demo` | same stores | demo data only |
 | localStorage | `garmin_dashboard_session` | `{ accessToken, expiresAt }` — the API key itself is never stored |
-| | `mk_fitness_prefs` | UI preferences (`lib/prefs.js` `DEFAULT_PREFS`) incl. local `displayName` |
+| | `mk_fitness_prefs` | UI preferences (`lib/prefs.js` `DEFAULT_PREFS`) incl. local `displayName`, `sleepNeedHours`, `wakeTime` (minutes after midnight, `null` = usual) |
 | | `mk_fitness_source` | `'garmin'` / `'demo'` |
 | | `mk_fitness_lock`, `mk_fitness_lock_fails` | lock credential id or salted PIN hash; wrong-PIN throttle |
 | | `mk_fitness_theme` | legacy v1 theme (read once into prefs) |

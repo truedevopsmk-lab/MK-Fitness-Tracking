@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { normMinutes, clockFromNorm, stageBreakdown, timeInBedSec, needSecFor, sleepDebt, consistency, recoveryPairs, buildRows, stageSummary, SUB_SCORES, subScoreRows, subScoreSummary, subScoreTally } from '../src/pages/sleepLogic.js'
+import { normMinutes, clockFromNorm, stageBreakdown, timeInBedSec, needSecFor, sleepDebt, consistency, recoveryPairs, buildRows, stageSummary, SUB_SCORES, subScoreRows, subScoreSummary, subScoreTally, clockToNorm, normToClock, sleepBank, usualWake, awakeBuffer, tonightPlan, sleepCoach, bankText } from '../src/pages/sleepLogic.js'
 
 const at = (d, h, m = 0) => new Date(2026, 9, d, h, m).getTime()
 // bedtime normalisation wraps past midnight
@@ -107,4 +107,92 @@ assert.equal(subScoreRows(dm[lastDay].sleep).length, 7)
 const win = eachDay(addDays(lastDay, -29), lastDay)
 assert.equal(subScoreTally(dm, win).nights, win.filter(x => dm[x]?.sleep?.subScores).length)
 assert.ok(subScoreTally(dm, win).nights >= 28)
+// ---- Sleep coach
+const { parseDay } = await import('../src/lib/dates.js')
+const ASOF = '2026-10-28'
+const NEED = 28800
+/** nights ending at `end`, one per entry of `specs` (oldest first): { dur, awake, wake (clock minutes), need } */
+const fixture = (specs, end = ASOF) => {
+  const out = {}
+  specs.forEach((sp, i) => {
+    const date = addDays(end, i - specs.length + 1), durationSec = sp.dur ?? NEED, awakeSec = sp.awake ?? 0
+    const endTs = parseDay(date).getTime() + (sp.wake ?? 390) * 60000
+    out[date] = { date, sleep: { durationSec, awakeSec, endTs, startTs: endTs - (durationSec + awakeSec) * 1000, ...(sp.need ? { needSec: sp.need } : {}) } }
+  })
+  return out
+}
+const nights = (n, spec) => Array.from({ length: n }, () => spec)
+const bankOf = specs => sleepBank(buildRows(fixture(specs), addDays(ASOF, -6), ASOF, 8))
+const planOf = bank => tonightPlan({ needSec: NEED, bank, wakeNorm: 750 })
+
+const behind = bankOf(nights(7, { dur: NEED - 3600 }))
+assert.equal(behind.net, 25200); assert.equal(behind.state, 'behind'); assert.equal(behind.below, 7); assert.equal(behind.ok, true)
+assert.equal(planOf(behind).paybackSec, 3600)
+const some = bankOf([...nights(2, { dur: NEED - 3600 }), ...nights(5, {})])
+assert.equal(some.net, 7200); assert.equal(planOf(some).paybackSec, 1800)
+const ahead = bankOf(nights(7, { dur: NEED + 7200 }))
+assert.equal(ahead.net, -25200); assert.equal(ahead.state, 'ahead'); assert.equal(planOf(ahead).paybackSec, 0)
+const few = bankOf(nights(2, { dur: NEED - 3600 }))
+assert.equal(few.ok, false); assert.equal(few.state, null); assert.equal(planOf(few).paybackSec, 0)
+const even = bankOf([{ dur: NEED - 600 }, ...nights(6, {})])
+assert.equal(even.net, 600); assert.equal(even.state, 'even'); assert.equal(planOf(even).paybackSec, 0)
+
+// usual wake
+const mixed = specs => buildRows(fixture(specs), addDays(ASOF, -13), ASOF, 8)
+const wk = d => [0, 6].includes(parseDay(d).getDay())
+const mixedRows = (() => { const f = fixture(nights(14, {})); for (const d of Object.keys(f)) f[d].sleep.endTs = parseDay(d).getTime() + (wk(d) ? 480 : 390) * 60000, f[d].sleep.startTs = f[d].sleep.endTs - NEED * 1000; return buildRows(f, addDays(ASOF, -13), ASOF, 8) })()
+assert.deepEqual(usualWake(mixedRows, '2026-10-29'), { norm: 750, nights: 10, dayType: 'weekday' })
+assert.deepEqual(usualWake(mixedRows, '2026-10-31'), { norm: 840, nights: 4, dayType: 'weekend' })
+const fiveRows = mixedRows.slice(-5)
+assert.equal(usualWake(fiveRows, '2026-10-31').dayType, 'all')
+assert.equal(usualWake(mixedRows.slice(-2), '2026-10-29'), null)
+assert.equal(usualWake(mixed(nights(3, { wake: 392 })), '2026-10-29').norm, 750)
+
+// awake buffer
+assert.deepEqual(awakeBuffer(mixed([{ awake: 600 }, { awake: 1200 }, { awake: 1800 }, { awake: 3000 }])), { sec: 1500, nights: 4 })
+assert.equal(awakeBuffer(mixed(nights(5, { awake: 9000 }))).sec, 5400)
+assert.deepEqual(awakeBuffer(mixed(nights(2, { awake: 900 }))), { sec: 0, nights: 2 })
+
+// tonight plan
+const tp = tonightPlan({ needSec: NEED, bank: { state: 'behind', net: 7200 }, bufferSec: 1200, wakeNorm: 750 })
+assert.equal(tp.inBedSec, 31800); assert.equal(tp.bedNorm, 220); assert.equal(clockFromNorm(tp.bedNorm), '9:40 pm')
+const tpAt = nowNorm => tonightPlan({ needSec: NEED, bank: { state: 'behind', net: 7200 }, bufferSec: 1200, wakeNorm: 750, nowNorm })
+assert.equal(tpAt(400).late, true); assert.equal(tpAt(400).leftSec, 19800)
+assert.equal(tpAt(100).late, false); assert.equal(tpAt(100).leftSec, null)
+assert.equal(tpAt(800).late, false)
+assert.equal(tonightPlan({ needSec: NEED, wakeNorm: null }), null)
+
+// clock axis
+assert.equal(clockToNorm(390), 750); assert.equal(clockToNorm(1320), 240)
+assert.equal(normToClock(750), 390); assert.equal(normToClock(-60), 1020)
+
+// coach
+const cf = fixture(nights(10, {}))
+const coachAt = (nowTs, o = {}) => sleepCoach(o.days ?? cf, { nowTs, ...o })
+assert.equal(coachAt(new Date(2026, 9, 28, 21, 0).getTime()).wakeDate, '2026-10-29')
+assert.equal(coachAt(new Date(2026, 9, 29, 1, 30).getTime()).wakeDate, '2026-10-29')
+// bank = the 7 nights before the next wake, before and after midnight; 4 am–6 pm is never "late"
+assert.equal(coachAt(new Date(2026, 9, 29, 1, 30).getTime()).bank.nights, 7)
+assert.equal(coachAt(new Date(2026, 9, 29, 1, 30).getTime()).plan.late, true)
+assert.equal(coachAt(new Date(2026, 9, 29, 5, 0).getTime()).wakeDate, '2026-10-30')
+assert.equal(coachAt(new Date(2026, 9, 29, 5, 0).getTime()).plan.late, false)
+assert.equal(coachAt(new Date(2026, 9, 28, 23, 30).getTime()).plan.late, true)
+assert.equal(coachAt(new Date(2026, 9, 28, 14, 0).getTime()).plan.late, false)
+const c1 = coachAt(new Date(2026, 9, 28, 21, 0).getTime(), { wakeClock: 420 })
+assert.equal(c1.wakeSource, 'chosen'); assert.equal(c1.plan.wakeNorm, 780)
+const c0 = sleepCoach({}, { nowTs: new Date(2026, 9, 28, 21, 0).getTime() })
+assert.equal(c0.has, false); assert.equal(c0.wakeSource, 'default'); assert.equal(c0.plan.wakeNorm, 780); assert.equal(c0.needSource, 'setting'); assert.equal(c0.plan.paybackSec, 0)
+const cg = sleepCoach(fixture(nights(5, { need: 27000 })), { nowTs: new Date(2026, 9, 28, 21, 0).getTime() })
+assert.equal(cg.needSource, 'garmin'); assert.equal(cg.plan.needSec, 27000)
+
+// bank text
+assert.equal(bankText(few), null)
+assert.equal(bankText(even), 'On track this week')
+assert.equal(bankText(behind), '7h 00m behind this week')
+assert.equal(bankText(ahead), '7h 00m ahead this week')
+
+// demo smoke
+const lastDemo = Object.keys(dm).sort().at(-1), [dy, dmo, dd] = lastDemo.split('-').map(Number)
+const dc = sleepCoach(dm, { nowTs: new Date(dy, dmo - 1, dd, 20, 0).getTime() })
+assert.equal(dc.bank.ok, true); assert.ok(dc.usual); assert.ok(dc.plan.bedNorm >= 120 && dc.plan.bedNorm <= 420, `bedNorm ${dc.plan.bedNorm}`); assert.ok(dc.buffer.nights >= 3)
 console.log('sleep logic ok')

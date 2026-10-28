@@ -71,6 +71,7 @@ node scripts/shot.mjs /tmp/shots '#/' '#/sleep@day' '#/reports/hrv@color' '#/tre
 | `@desktop` | 1280×900 |
 | `@empty` | real (empty) database with a fake session — checks empty states |
 | `@real` | no demo data, no session — shows the Connect screen |
+| `@t2130` | fixed clock at 21:30 today — for time-of-day UI (greeting, Sleep coach “Tonight”) |
 
 It prints console errors per route and exits 1 if a page threw. The script grows the viewport to
 the page height before capturing (full-page capture makes recharts re-layout and draw blank charts).

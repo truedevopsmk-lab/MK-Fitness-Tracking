@@ -65,3 +65,17 @@
 .sl-factor-detail { font-size: 13px; color: var(--text-2); line-height: 1.35; }
 .sl-tally { display: grid; gap: 14px; margin-bottom: 2px; }
 @media (min-width: 900px) { .sl-tally { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; } }
+
+.sl-tonight { background: linear-gradient(160deg, color-mix(in srgb, var(--hue-sleep) 12%, var(--surface)), var(--surface) 60%); }
+.sl-plan { display: grid; gap: 18px; }
+.sl-plan-main { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.sl-plan-head { display: flex; align-items: center; gap: 14px; }
+.sl-plan-ico { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; flex: none; background: color-mix(in srgb, var(--hue-sleep) 18%, transparent); color: var(--hue-sleep); }
+.sl-plan-time { font-size: 40px; font-weight: 600; line-height: 1.05; margin-top: 4px; }
+.sl-plan-cap { font-size: 14px; color: var(--text-2); line-height: 1.35; margin-top: 4px; }
+.sl-plan-total { font-size: 17px; }
+.sl-field { display: grid; gap: 8px; }
+.sl-callout { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); border-left: 3px solid var(--hue-sleep); font-size: 14px; line-height: 1.45; }
+.sl-callout svg { flex: none; margin-top: 2px; color: var(--hue-sleep); }
+@media (min-width: 900px) { .sl-plan { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 32px; } .sl-plan-calc { border-left: 1px solid var(--border); padding-left: 28px; } }
+.sl-page .chart + .kv { margin-top: 14px; }

@@ -2,10 +2,12 @@
 import { useSyncExternalStore } from 'react'
 
 const KEY = 'mk_fitness_prefs'
+export const SLEEP_NEED_OPTIONS = [7, 7.5, 8, 8.5, 9]
 export const DEFAULT_PREFS = {
   theme: 'night',          // 'night' | 'day' | 'color' | 'auto'
   startPage: 'today',      // 'today' | 'morning'
   sleepNeedHours: 8,       // used for sleep debt when Garmin provides no sleep need
+  wakeTime: null,          // Sleep coach wake time in minutes after midnight (390 = 6:30 am); null = your usual
   autoSync: true,          // incremental sync on open when the last sync is > 30 min old
   historyDays: 365,        // full-sync depth for range endpoints
   perDayDays: 90,          // full-sync depth for per-day endpoints (one request per day)

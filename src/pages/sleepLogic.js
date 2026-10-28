@@ -1,5 +1,5 @@
 // Pure sleep calculations (no React) so they can be unit-tested in Node.
-import { eachDay } from '../lib/dates.js'
+import { addDays, eachDay, parseDay, toDay } from '../lib/dates.js'
 import { fmtDuration } from '../lib/format.js'
 import { mean, stdev, correlation } from '../lib/stats.js'
 
@@ -179,4 +179,69 @@ export function subScoreTally(days, dates) {
   const top = items[0]
   const text = nights === 0 ? null : !top || top.low === 0 ? `Every part rated good or better on all ${nights} nights.` : `${top.label} rated fair or poor most often: ${top.low} of ${top.rated} nights.`
   return { nights, items, text }
+}
+
+/* ---------- Sleep coach ---------- */
+export const PAYBACK_NIGHTS = 4, PAYBACK_CAP_SEC = 3600, BANK_MIN_NIGHTS = 3, WAKE_MIN = 240, WAKE_MAX = 660, WAKE_STEP = 15
+const median = a => { const v = a.filter(num).sort((x, y) => x - y), m = v.length >> 1; return !v.length ? null : v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2 }
+const round5 = sec => Math.round(sec / 300) * 300
+const isWeekend = date => { const d = parseDay(date).getDay(); return d === 0 || d === 6 }
+/** Clock minutes after midnight ↔ minutes since 18:00 (the normMinutes axis). */
+export const clockToNorm = clock => (clock - ANCHOR_MIN + 1440) % 1440
+export const normToClock = norm => ((Math.round(norm) + ANCHOR_MIN) % 1440 + 1440) % 1440
+
+/** Last-7-nights bank: net > 0 is behind. State needs BANK_MIN_NIGHTS nights; within 15 min counts as even. */
+export function sleepBank(weekRows) {
+  const d = sleepDebt(weekRows, 7), ok = d.nights >= BANK_MIN_NIGHTS
+  return { ...d, ok, state: !ok ? null : Math.abs(d.net) < 900 ? 'even' : d.net > 0 ? 'behind' : 'ahead', below: weekRows.filter(r => r.has && r.balance < 0).length }
+}
+
+/** Median wake time (norm minutes) over recent nights, preferring nights of the same weekday/weekend type. */
+export function usualWake(rows, wakeDate, n = 14) {
+  const recent = rows.slice(-n).filter(r => num(r.wakeMin))
+  const same = recent.filter(r => isWeekend(r.date) === isWeekend(wakeDate))
+  const pick = same.length >= 3 ? same : recent
+  if (pick.length < 3) return null
+  return { norm: Math.round(median(pick.map(r => r.wakeMin)) / 5) * 5, nights: pick.length, dayType: pick === same ? (isWeekend(wakeDate) ? 'weekend' : 'weekday') : 'all' }
+}
+
+/** Typical time in bed spent awake (s), from recent nights; 0 until there are 3 nights to learn from. */
+export function awakeBuffer(rows, n = 14) {
+  const values = rows.slice(-n).filter(r => r.has).map(r => {
+    const inBed = num(r.startTs) && num(r.endTs) && r.endTs > r.startTs ? (r.endTs - r.startTs) / 1000 : num(r.awake) ? r.dur + r.awake : null
+    return inBed == null ? null : Math.max(0, inBed - r.dur)
+  }).filter(num)
+  return values.length < 3 ? { sec: 0, nights: values.length } : { sec: Math.min(5400, round5(median(values))), nights: values.length }
+}
+
+/** Bedtime = wake − (need + bank payback + usual time awake). `late` when now is already inside tonight's sleep window. */
+export function tonightPlan({ needSec, bank, bufferSec = 0, wakeNorm, nowNorm = null }) {
+  if (!num(needSec) || !num(wakeNorm)) return null
+  const paybackSec = bank?.state === 'behind' ? Math.min(PAYBACK_CAP_SEC, round5(bank.net / PAYBACK_NIGHTS)) : 0
+  const asleepSec = needSec + paybackSec, inBedSec = asleepSec + bufferSec, bedNorm = wakeNorm - inBedSec / 60
+  const late = num(nowNorm) && nowNorm >= bedNorm && nowNorm < wakeNorm
+  const leftSec = late ? Math.max(0, Math.floor(((wakeNorm - nowNorm) * 60 - bufferSec) / 300) * 300) : null
+  return { needSec, paybackSec, bufferSec, asleepSec, inBedSec, bedNorm, wakeNorm, late, leftSec }
+}
+
+/**
+ * Everything the Tonight card, Sleep bank card and Today row need. Before 4 am the plan is for this
+ * morning's wake; the bank is always the 7 nights before that wake, and "late" only applies from 6 pm.
+ */
+export function sleepCoach(days, { prefHours = 8, wakeClock = null, nowTs = Date.now() } = {}) {
+  const now = new Date(nowTs), h = now.getHours(), wakeDate = addDays(toDay(now), h < 4 ? 0 : 1)
+  const rows = buildRows(days, addDays(wakeDate, -14), addDays(wakeDate, -1), prefHours), week = rows.slice(-7), bank = sleepBank(week)
+  const usual = usualWake(rows, wakeDate)
+  const wakeSource = wakeClock != null ? 'chosen' : usual ? 'usual' : 'default'
+  const wakeNorm = wakeClock != null ? clockToNorm(wakeClock) : usual ? usual.norm : clockToNorm(420)
+  const lastSleep = days[rows.filter(r => r.has).at(-1)?.date]?.sleep
+  const needSec = needSecFor(lastSleep, prefHours), needSource = num(lastSleep?.needSec) && lastSleep.needSec > 0 ? 'garmin' : 'setting'
+  const buffer = awakeBuffer(rows)
+  const plan = tonightPlan({ needSec, bank, bufferSec: buffer.sec, wakeNorm, nowNorm: h < 4 || h >= 18 ? normMinutes(nowTs) : null })
+  return { has: rows.some(r => r.has), week, bank, usual, wakeDate, wakeSource, needSource, buffer, plan }
+}
+
+export function bankText(bank) {
+  if (!bank?.ok) return null
+  return bank.state === 'even' ? 'On track this week' : bank.net > 0 ? `${fmtDuration(bank.net)} behind this week` : `${fmtDuration(-bank.net)} ahead this week`
 }

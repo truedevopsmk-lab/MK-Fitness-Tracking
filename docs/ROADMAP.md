@@ -7,7 +7,7 @@ Ideas, known gaps and tech debt. Move items to "Done" (with the PR) as they land
 - [x] **Training readiness / sleep need from Garmin.** Both 404 for Personal API keys (capability
   check, 2026-10-28) — recorded in `GARMIN-API.md`. The Recovery estimate is the permanent hero.
 - [x] **Sleep need setting drives recovery.** `prefs.sleepNeedHours` is the only source of sleep need
-  on Personal keys; sleep debt and the recovery estimate both use it. Surfacing it better is part of A4.
+  on Personal keys; sleep debt, the recovery estimate and the bedtime planner use it; it is also set from the Tonight card (A4).
 - [x] **Verify experimental endpoints** — `userSummary` and `heartRate` promoted; `intensity` and
   `readiness` 404 and stay experimental.
 
@@ -25,7 +25,7 @@ by the user and kept on the device.
   - [x] A2 Recovery breakdown — what moved today's recovery (sleep, HRV, RHR, respiration) (Have)
   - [x] A3 Health monitor — RHR / HRV / respiration against the 30-day normal range; SpO₂ only if present (Have)
   - [x] A5 Garmin sleep sub-scores — duration, stress, awakenings, restlessness, stage mix (Have — in sleep summaries)
-  - [ ] A4 Sleep coach — 7-day sleep bank, tonight's need, bedtime planner from a wake time (Have)
+  - [x] A4 Sleep coach — 7-day sleep bank, tonight's need, bedtime planner from a wake time (Have)
   - [ ] A1 Effort score + daily target — strain-like 0–100 from training load and steps, target from recovery (Have)
   - [ ] A6 Resilience — 14-day recovery vs strain balance (Have)
   - [ ] A7 Day timeline — sleep, activities, intraday HR and Body Battery on one line (Have; no stress timeline)
@@ -86,4 +86,7 @@ by the user and kept on the device.
 - A3 Health monitor: `#/reports/health` compares resting HR, HRV, overnight breathing (and SpO₂
   when recorded) with your own 30-night normal range; status row on Today, card on Reports (`740fb7e`).
 - A5 Sleep sub-scores: "What shaped your score" on Sleep shows Garmin's rating, your value and the
-  optimal range for each part of the night; "What holds your score back" tallies fair/poor nights per range.
+  optimal range for each part of the night; "What holds your score back" tallies fair/poor nights per range (`3f7a64a`).
+- A4 Sleep coach: "Tonight" card on Sleep turns a wake time (your usual weekday/weekend one, or
+  your choice) into a bedtime covering sleep need + sleep-bank payback + usual time awake; 7-night
+  "Sleep bank" card; "Tonight" row on Today; sleep need settable in the card.
