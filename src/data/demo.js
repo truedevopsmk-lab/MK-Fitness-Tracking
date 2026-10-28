@@ -205,13 +205,14 @@ export function generateDemoJournal(days, seed = 4242) {
   for (const date of eachDay(addDays(end, -119), end)) {
     if (rand() >= .8) continue
     const day = byDate.get(date), next = byDate.get(addDays(date, 1))
-    const poor = next?.sleep?.score != null && next.sleep.score < 70
+    const score = next?.sleep?.score
+    const poor = score != null && score < 80, good = score != null && score >= 88
     const dow = parseDay(date).getDay(), weekend = dow === 5 || dow === 6
     const stressy = day?.stress?.avg > 40
     const p = {
-      alcohol: (weekend ? .35 : .08) + (poor ? .2 : 0), lateMeal: .15 + (poor ? .15 : 0), lateCaffeine: .1 + (poor ? .1 : 0),
+      alcohol: (weekend ? .3 : .06) + (poor ? .3 : 0), lateMeal: .12 + (poor ? .25 : 0), lateCaffeine: .08 + (poor ? .2 : 0),
       screens: .3, lateWorkout: .08, stress: .12 + (stressy ? .3 : 0), travel: .03, nap: day?.sleep?.napSec > 0 ? .7 : .06,
-      outdoors: .25, meditation: .2, stretching: .15, sauna: .04,
+      outdoors: .25, meditation: .12 + (good ? .25 : 0), stretching: .1 + (good ? .15 : 0), sauna: .04,
     }
     const tags = TAGS.filter(t => rand() < p[t.key]).map(t => t.key)
     out.push({ date, tags: cleanTags(tags), updatedAt: parseDay(addDays(date, 1)).getTime() + 9 * 3600e3 })

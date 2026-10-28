@@ -58,6 +58,7 @@ src/
     resilience.js        14-day recovery vs 14-day effort: a four-state balance, change vs the 14 days before, next-day bounce after hard days
     timeline.js          one day's window (opens at last night's bedtime): sleep and workout segments, gap-broken HR and Body Battery, stats, hourly rows, events
     health.js            health monitor: overnight vitals against your own 30-night normal range
+    habits.js            habit impact: the night after tagged days against logged days without the tag (≥ 5 each way, sample sizes, clear vs varies)
     activities.js        activity helpers (type groups, pace, training effect, load)
     name.js              greeting-name resolution (local override, ignores Garmin UUIDs)
     prefs.js             UI preferences in localStorage + usePrefs()
@@ -200,7 +201,7 @@ Hash routes (work on static hosting): `useRoute()` → `{ path, segments, params
 | `#/morning` | `pages/Morning.jsx` |
 | `#/trends`, `#/trends/:metric?range=&g=&end=` | `pages/Trends.jsx`, `pages/TrendDetail.jsx` |
 | `#/sleep?date=&range=` | `pages/Sleep.jsx` (`#/reports/sleep` redirects here) |
-| `#/reports`, `#/reports/:kind?range=` (recovery and timeline also `&date=`) | `pages/Reports.jsx`, `pages/reports/*` (map in `App.jsx` `REPORTS`) |
+| `#/reports`, `#/reports/:kind?range=` (recovery and timeline also `&date=`, habits `&m=`) | `pages/Reports.jsx`, `pages/reports/*` (map in `App.jsx` `REPORTS`) |
 | `#/activities`, `#/activities/:id` | `pages/Activities.jsx`, `pages/ActivityDetail.jsx` |
 | `#/journal?date=` | `pages/Journal.jsx` |
 | `#/insights` | `pages/Insights.jsx` |

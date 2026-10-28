@@ -29,8 +29,8 @@ Why things are the way they are. Read before "fixing" something that looks odd.
 - **Journal import: newest edit wins, ties keep local.** An incoming entry replaces the local one only when it
   has a later `updatedAt` and different tags.
 - **Demo journal has its own seed and follows sleep.** `generateDemoJournal` uses a separate RNG so `generateDemo`
-  output is unchanged, and makes alcohol and late meals likelier before poor nights, so Habit impact has
-  something to show. Yesterday and today stay unlogged to show the check-in prompt.
+  output is unchanged, and makes alcohol, late meals and late caffeine likelier before nights scoring under 80, and meditation and
+  stretching likelier before nights of 88 or more, so Habit impact has something to show. Yesterday and today stay unlogged to show the check-in prompt.
 
 ## Sync
 
@@ -51,6 +51,7 @@ Why things are the way they are. Read before "fixing" something that looks odd.
 
 ## Health logic
 
+- **Habit impact pairs a tag with the night after.** Day D's tags are compared on D + 1's sleep score, recovery, HRV and resting HR, against logged days without the tag; unlogged days are left out. A comparison needs 5 days each way and always shows both counts. A difference below the metric's delta noise floor reads "about the same"; one smaller than twice its standard error reads "varies a lot" and is never listed under "What stands out". Copy says what follows a tag, never what it causes.
 - **Recovery estimate is labelled as such.** When Garmin's training readiness isn't available the
   hero shows "Recovery estimate" with the note "It is not a Garmin number".
   It blends sleep score with duration vs need (0.4), HRV vs its own 7-day baseline (0.35, plateaus

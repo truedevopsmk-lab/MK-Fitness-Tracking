@@ -56,7 +56,7 @@ export default function Journal() {
           </li>)}
         </ul>
       </Card>
-      <Card title="Most tagged" subtitle={`Last 30 days · ${count(stats.logged)} logged`} className="jr-most">
+      <Card title="Most tagged" subtitle={`Last 30 days · ${count(stats.logged)} logged`} className="jr-most" action={<Button size="sm" variant="ghost" href="#/reports/habits">Habit impact</Button>}>
         {stats.counts.length
           ? <ul className="rp-list">{stats.counts.map(c => <li key={c.key}>
             <span className="jr-most-label">{c.label}</span>

@@ -31,7 +31,7 @@ by the user and kept on the device.
   - [x] A7 Day timeline — sleep, activities, intraday HR and Body Battery on one line (Have; no stress timeline)
 - **Phase 2 · Journal** (Log; never leaves the device)
   - [x] B1 Daily tags (alcohol, late meal, caffeine, travel, …) with a quick morning check-in
-  - [ ] B2 Habit impact — ≥ 5 days with and ≥ 5 without before showing a difference, with sample sizes
+  - [x] B2 Habit impact — ≥ 5 days with and ≥ 5 without before showing a difference, with sample sizes
   - [ ] B3 Day status — sick / injured / travelling / break, excluded from baselines
   - [ ] B4 Counters — water, caffeine, alcohol
 - **Phase 3 · Training**
@@ -98,3 +98,4 @@ by the user and kept on the device.
   on one axis with an event list (`e2cda50`).
 - B1 Daily tags: on-device journal of tags (alcohol, late meal, travel, …) in its own IndexedDB store; check-in
   card on Morning, Journal row on Today, `#/journal?date=`, included in JSON export/import (`22f769e`).
+- B2 Habit impact: `#/reports/habits` compares the night after each tag with logged days without it (5+ each way, sample sizes always shown, clear vs varies), "What stands out" lead, card on Reports, link from Journal.

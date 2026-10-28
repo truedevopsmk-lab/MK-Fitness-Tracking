@@ -6,12 +6,14 @@ import { fmtNumber } from '../lib/format'
 import { addDays, today } from '../lib/dates'
 import { recoverySeries } from '../lib/homeLogic'
 import { effortSeries } from '../lib/effort'
+import { habitImpact, findings } from '../lib/habits'
 import { MIN_PAIRED, resilienceFor, resilienceSeries, stateInfo } from '../lib/resilience'
 import { MIN_NIGHTS, healthMonitor } from '../lib/health'
 import { dayTimeline, defaultTimelineDay } from '../lib/timeline'
 import { usePrefs } from '../lib/prefs'
 import Sparkline from '../charts/Sparkline'
 import { dayLabel } from '../components/DateStepper'
+import DeltaChip from '../components/DeltaChip'
 import Badge from '../components/Badge'
 import Icon from '../components/Icon'
 import Empty from '../components/Empty'
@@ -34,12 +36,13 @@ const REPORTS = [
   { id: 'res', title: 'Resilience', icon: 'scale', hue: 'readiness', to: '#/reports/resilience', desc: 'Whether recovery is keeping up with your effort', custom: 'res' },
   { id: 'health', title: 'Health monitor', icon: 'shield', hue: 'heart', to: '#/reports/health', desc: 'Resting HR, HRV and breathing against your normal range', custom: 'health' },
   { id: 'day', title: 'Day timeline', icon: 'clock', hue: 'heart', to: '#/reports/timeline', desc: 'Sleep, workouts, heart rate and Body Battery through one day', custom: 'day' },
+  { id: 'habits', title: 'Habit impact', icon: 'tag', hue: 'readiness', to: '#/reports/habits', desc: 'How your nights compare after tagged days', custom: 'habits' },
 ]
 
 function useCards() {
-  const days = useStore(s => s.days), acts = useStore(s => s.activities), { sleepNeedHours } = usePrefs()
+  const days = useStore(s => s.days), acts = useStore(s => s.activities), journal = useStore(s => s.journal), { sleepNeedHours } = usePrefs()
   return useMemo(() => REPORTS.map(r => {
-    let series = [], value = null, sub = r.label, vitals, emptyText
+    let series = [], value = null, sub = r.label, vitals, emptyText, chips
     if (r.custom === 'day') {
       const d = defaultTimelineDay(days, today())
       if (d) {
@@ -57,6 +60,11 @@ function useCards() {
       value = info ? info.short : null; sub = x.recovery == null ? '' : `recovery ${Math.round(x.recovery)} · effort ${Math.round(x.effort)}`
       if (x.reason === 'history') emptyText = `Builds after ${MIN_PAIRED} scored days`
       series = resilienceSeries(days, acts, addDays(today(), -6), today(), { sleepNeedHours }).map(y => ({ date: y.date, value: y.recovery }))
+    } else if (r.custom === 'habits') {
+      const x = habitImpact(days, journal, addDays(today(), -119), today(), { sleepNeedHours })
+      if (x.ready) { value = String(x.clearTags); sub = `${x.clearTags === 1 ? 'tag stands' : 'tags stand'} out · last 120 days` }
+      else emptyText = x.logged ? 'Compares a tag after 5 days with it and 5 without' : 'Tag your days in the Journal to compare'
+      chips = findings(x, 3)
     } else if (r.key || r.custom === 'rec' || r.custom === 'effort') {
       const from = addDays(today(), -6)
       series = r.key ? lastNDays(days, r.key, 7) : r.custom === 'effort' ? effortSeries(days, acts, from, today(), { sleepNeedHours }).map(x => ({ date: x.date, value: x.value })) : recoverySeries(days, from, today(), { sleepNeedHours })
@@ -75,8 +83,8 @@ function useCards() {
         const s = sum(series.map(p => p.value)); value = s == null ? null : fmtNumber(Math.round(s)); sub = 'load, last 7 days'
       }
     }
-    return { ...r, series, value, sub, vitals, emptyText }
-  }), [days, acts, sleepNeedHours])
+    return { ...r, series, value, sub, vitals, emptyText, chips }
+  }), [days, acts, journal, sleepNeedHours])
 }
 
 export default function Reports() {
@@ -93,7 +101,9 @@ export default function Reports() {
         <div className="rp-card-val">{c.value != null ? <><strong className="num">{c.value}</strong><span>{c.sub}</span></> : <span>{c.emptyText || 'No data in the last 7 days'}</span>}</div>
         {c.custom === 'health'
           ? <div className="rp-card-vitals">{c.vitals.map(v => <Badge key={v.key} tone={v.tone}>{v.short}</Badge>)}</div>
-          : <Sparkline data={c.series} hue={c.hue} height={36} label={`${c.title}, last 7 days`} />}
+          : c.custom === 'habits'
+            ? <div className="rp-card-vitals">{c.chips.map(f => <DeltaChip key={f.tag} delta={f.cmp.diff} metricKey={f.outcome.metric} text={f.label} />)}</div>
+            : <Sparkline data={c.series} hue={c.hue} height={36} label={`${c.title}, last 7 days`} />}
       </a>)}
     </div>
   </div>
