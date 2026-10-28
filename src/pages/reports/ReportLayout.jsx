@@ -15,7 +15,8 @@
 //
 // Helpers: useRange() → [range, setRange] stored in ?range= (default 30), HowToRead (plain-language note),
 // ReportNote (one-line muted note for hidden sections), rangeBounds(range), fmtDec, TableView (collapsible table),
-// WeekdayBars + weekdayAverages (Mon–Sun pattern), MiniTrend (small labelled line/area/bar chart for any series).
+// WeekdayBars + weekdayAverages (Mon–Sun pattern), MiniTrend (small labelled line/area/bar chart for any series),
+// LinesChart (several lines on one axis), StackedColumns.
 import { useCallback, useMemo, useState } from 'react'
 import { Area, Bar, BarChart, CartesianGrid, ComposedChart, Line, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { parseDay } from '../../lib/dates'
@@ -144,6 +145,34 @@ export function MiniTrend({ data, label, hue = 'steps', kind = 'line', height = 
         {kind === 'bar' ? <Bar dataKey="value" fill={color} maxBarSize={24} radius={[4, 4, 0, 0]} isAnimationActive={false} />
           : kind === 'area' ? <Area type="linear" fill={color} fillOpacity={.1} {...common} /> : <Line type="linear" {...common} />}
         {line2 && <Line dataKey={line2} type="linear" stroke={t.text3} strokeWidth={1.5} strokeDasharray="4 4" dot={false} activeDot={false} connectNulls={false} isAnimationActive={false} />}
+      </ComposedChart>
+    </ResponsiveContainer>
+  </div>
+}
+
+/** Animation-free multi-line chart on one y-axis. series [{key,label,color}]; domain [lo,hi] fixed, else from the data. */
+export function LinesChart({ data, series, domain, format = v => fmtNumber(v), axisFormat, height = 200, ariaLabel }) {
+  const t = useChartTheme()
+  const lines = series.map(s => ({ ...s, c: t.color(s.color) }))
+  const vals = data.flatMap(p => lines.map(s => p[s.key])).filter(num)
+  const { ticks, domain: dom } = niceTicks(domain ? domain[0] : (vals.length ? Math.min(...vals) : 0), domain ? domain[1] : (vals.length ? Math.max(...vals) : 1), 4)
+  const tick = { fill: t.text3, fontSize: 11, fontFamily: t.fontUi }
+  const lonely = (k, i) => num(data[i]?.[k]) && !num(data[i - 1]?.[k]) && !num(data[i + 1]?.[k])
+  const Tip = ({ active, payload }) => {
+    const p = active && payload?.[0]?.payload
+    return p ? <TipCard title={defaultTipTitle(p.date)} rows={lines.map(s => ({ color: s.c, value: num(p[s.key]) ? format(p[s.key]) : 'No data', label: s.label }))} /> : null
+  }
+  return <div className="chart" role="img" aria-label={ariaLabel || 'Line chart'}>
+    <ul className="legend">{lines.map(s => <li key={s.key}><i style={{ background: s.c }} />{s.label}</li>)}</ul>
+    <ResponsiveContainer width="100%" height={height} minWidth={0}>
+      <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <CartesianGrid vertical={false} stroke={t.grid} strokeDasharray="" />
+        <XAxis dataKey="date" tickFormatter={d => fmtDay(d)} tick={tick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={44} tickMargin={8} padding={{ left: 8, right: 8 }} />
+        <YAxis ticks={ticks} domain={dom} tickFormatter={v => (axisFormat || format)(v)} tick={tick} axisLine={false} tickLine={false} width={44} />
+        <Tooltip content={<Tip />} cursor={{ stroke: t.text3, strokeWidth: 1 }} isAnimationActive={false} wrapperStyle={{ outline: 'none', zIndex: 5 }} />
+        {lines.map(s => <Line key={s.key} type="linear" dataKey={s.key} stroke={s.c} strokeWidth={2} strokeLinecap="round" connectNulls={false} isAnimationActive={false}
+          dot={({ cx, cy, index }) => lonely(s.key, index) && num(cx) ? <circle key={index} cx={cx} cy={cy} r={3} fill={s.c} stroke={t.surface} strokeWidth={2} /> : <g key={index} />}
+          activeDot={{ r: 4, fill: s.c, stroke: t.surface, strokeWidth: 2 }} />)}
       </ComposedChart>
     </ResponsiveContainer>
   </div>

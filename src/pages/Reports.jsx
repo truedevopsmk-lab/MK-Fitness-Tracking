@@ -6,6 +6,7 @@ import { fmtNumber } from '../lib/format'
 import { addDays, today } from '../lib/dates'
 import { recoverySeries } from '../lib/homeLogic'
 import { effortSeries } from '../lib/effort'
+import { MIN_PAIRED, resilienceFor, resilienceSeries, stateInfo } from '../lib/resilience'
 import { MIN_NIGHTS, healthMonitor } from '../lib/health'
 import { usePrefs } from '../lib/prefs'
 import Sparkline from '../charts/Sparkline'
@@ -28,6 +29,7 @@ const REPORTS = [
   { id: 'load', title: 'Training load', icon: 'flame', hue: 'intensity', to: '#/reports/training-load', desc: 'Load, intensity minutes and balance', custom: 'load' },
   { id: 'effort', title: 'Effort', icon: 'gauge', hue: 'intensity', to: '#/reports/effort', desc: 'Daily effort against a target from your recovery', custom: 'effort', label: 'avg effort' },
   { id: 'rec', title: 'Recovery', icon: 'battery', hue: 'readiness', to: '#/reports/recovery', desc: 'Recovery estimate, sleep, HRV and Body Battery together', custom: 'rec', label: 'avg recovery' },
+  { id: 'res', title: 'Resilience', icon: 'scale', hue: 'readiness', to: '#/reports/resilience', desc: 'Whether recovery is keeping up with your effort', custom: 'res' },
   { id: 'health', title: 'Health monitor', icon: 'shield', hue: 'heart', to: '#/reports/health', desc: 'Resting HR, HRV and breathing against your normal range', custom: 'health' },
 ]
 
@@ -39,6 +41,11 @@ function useCards() {
       const m = healthMonitor(days, today())
       value = m.total ? `${m.total - m.outside} of ${m.total}` : null; sub = 'vitals in your normal range'; vitals = m.vitals
       if (m.pending.some(x => x.reason === 'no-range')) emptyText = `Range builds after ${MIN_NIGHTS} nights`
+    } else if (r.custom === 'res') {
+      const x = resilienceFor(days, acts, today(), { sleepNeedHours }), info = stateInfo(x.state)
+      value = info ? info.short : null; sub = x.recovery == null ? '' : `recovery ${Math.round(x.recovery)} · effort ${Math.round(x.effort)}`
+      if (x.reason === 'history') emptyText = `Builds after ${MIN_PAIRED} scored days`
+      series = resilienceSeries(days, acts, addDays(today(), -6), today(), { sleepNeedHours }).map(y => ({ date: y.date, value: y.recovery }))
     } else if (r.key || r.custom === 'rec' || r.custom === 'effort') {
       const from = addDays(today(), -6)
       series = r.key ? lastNDays(days, r.key, 7) : r.custom === 'effort' ? effortSeries(days, acts, from, today(), { sleepNeedHours }).map(x => ({ date: x.date, value: x.value })) : recoverySeries(days, from, today(), { sleepNeedHours })

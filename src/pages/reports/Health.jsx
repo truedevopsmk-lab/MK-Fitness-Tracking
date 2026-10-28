@@ -11,6 +11,8 @@ import ReportLayout, { HowToRead, MiniTrend, TableView, rangeBounds, useRange } 
 const NAME = { restingHr: 'Resting HR', hrv: 'HRV', respiration: 'Breathing', spo2: 'SpO₂' }
 const unitOf = k => METRICS[k].unit === '%' ? '%' : ` ${METRICS[k].unit}`
 const pctOf = (v, lo, hi) => (v - lo) / (hi - lo) * 100
+// Non-breaking spaces so a narrow card wraps after a separator, never leaving '· 4 below' to start a line
+const outside = c => ['nights in range', c.above && `${c.above}\u00a0above`, c.below && `${c.below}\u00a0below`].filter(Boolean).join('\u00a0· ')
 
 function RangeBar({ vitalKey, value, low, high }) {
   const span = high - low || 1
@@ -95,7 +97,7 @@ export default function Health() {
     summary={[{ label: 'All in range', value: d.scored ? `${d.allIn} of ${d.scored}` : '—', sub: d.scored ? 'nights with every vital inside' : `Needs ${MIN_NIGHTS} nights first` },
       ...d.keys.map(k => {
         const c = d.counts[k]
-        return { label: NAME[k], value: c.scored ? `${c.within} of ${c.scored}` : '—', sub: c.scored ? `nights in range${c.above ? ` · ${c.above} above` : ''}${c.below ? ` · ${c.below} below` : ''}` : `Needs ${MIN_NIGHTS} nights first` }
+        return { label: NAME[k], value: c.scored ? `${c.within} of ${c.scored}` : '—', sub: c.scored ? outside(c) : `Needs ${MIN_NIGHTS} nights first` }
       })]}>
     <Card title="Over time" subtitle="Shaded band is your normal range on each night; dots mark nights outside it">
       <div className="rp-multiples">

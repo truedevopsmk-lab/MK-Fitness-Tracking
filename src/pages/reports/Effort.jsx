@@ -35,13 +35,13 @@ function DayEffort({ days, acts, pts, sleepNeedHours }) {
       <div className="rb-head-text">
         <span className="rb-kind">Effort estimate</span>
         <p className="rb-lead">{leadFor(e, target, recScore, isToday)}</p>
-        {(target || recScore != null) && <div className="ef-chips">
-          {target && <Badge tone="neutral">Target {target.lo}–{target.hi}</Badge>}
-          {recScore != null && <Badge tone="neutral">Recovery {recScore}</Badge>}
+        {(target || recScore != null) && <div className="rp-chips">
+          {target && <Badge tone="neutral" icon={false}>Target {target.lo}–{target.hi}</Badge>}
+          {recScore != null && <Badge tone="neutral" icon={false}>Recovery {recScore}</Badge>}
         </div>}
       </div>
     </div>
-    {(scored || e.points != null) && <ul className="rp-list ef-parts">
+    {(scored || e.points != null) && <ul className="rp-list rp-list-gap">
       <li><span className="rp-li-main">Workouts<small>{e.workouts ? `${e.workouts} workout${e.workouts === 1 ? '' : 's'}` : 'No workouts this day'}</small></span>
         <strong className="num">{e.load ? `Load ${r0(e.load)}` : 'None'}</strong></li>
       <li><span className="rp-li-main">Everyday steps<small>{fmtNumber(e.everydaySteps ?? 0)} steps outside workouts · {STEP_POINTS} points per 1,000</small></span>

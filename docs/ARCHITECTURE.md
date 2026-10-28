@@ -55,6 +55,7 @@ src/
     insights.js          personal insight detectors
     homeLogic.js         Today/Morning logic (recovery estimate + breakdown, week grid, deltas)
     effort.js            effort score: training load + everyday steps against your own 28-day usual; daily target from recovery
+    resilience.js        14-day recovery vs 14-day effort: a four-state balance, change vs the 14 days before, next-day bounce after hard days
     health.js            health monitor: overnight vitals against your own 30-night normal range
     activities.js        activity helpers (type groups, pace, training effect, load)
     name.js              greeting-name resolution (local override, ignores Garmin UUIDs)
@@ -237,7 +238,7 @@ stays hidden on watches that never record it). Also exported: `SLEEP_STAGES`, `S
 Charts (`src/charts/`): `TrendChart` (single series: line/area/bar, goal/baseline lines, shaded band,
 gaps for missing days), `StackedBars` (stacked columns + legend), `Sparkline` (plain SVG, no recharts).
 `pages/reports/ReportLayout.jsx` also exports report building blocks (`ReportLayout`, `useRange`,
-`MiniTrend`, `StackedColumns`, `WeekdayBars`, `TableView`, `HowToRead`, `ReportNote`) — see
+`MiniTrend`, `LinesChart`, `StackedColumns`, `WeekdayBars`, `TableView`, `HowToRead`, `ReportNote`) — see
 [ROADMAP.md](ROADMAP.md) "chart duplication".
 
 ## Design system

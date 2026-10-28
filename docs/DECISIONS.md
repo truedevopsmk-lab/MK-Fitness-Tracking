@@ -88,6 +88,15 @@ Why things are the way they are. Read before "fixing" something that looks odd.
   every day, and it needs 14 days of data before any score shows. The daily target (60–80, 40–60,
   20–40) reuses the recovery headline cut points (75 and 50). It is not in the metric registry because
   it needs activities and history, same as the recovery estimate. Copy calls it an estimate, not a Garmin number.
+- **Resilience is a four-state label, not a number.** It compares the 14-day average recovery with the
+  14-day average effort. A single score would suggest precision the inputs don't have, and a fortnight
+  moves slowly, so a state (Strong, Fresh, Stretched, Low recovery) is honest and stable. The split
+  points reuse numbers already in the app: recovery 60 (the midpoint of the recovery scale) and
+  effort 50 (a usual day for you). Only days with both a recovery and an effort score count, and it needs 7
+  of the 14 before showing a state. "After hard days" compares recovery on the day after a day with effort 65
+  or more with recovery after other days, using the *next* day's recovery because sleep belongs to the
+  wake-up day; it needs 3 hard and 3 other days in the last 28. The change line compares with the 14 days before
+  and needs 7 recovery days there.
 
 ## UI
 
