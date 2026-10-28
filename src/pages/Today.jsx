@@ -8,6 +8,7 @@ import { computeInsights } from '../lib/insights'
 import { latestValue, lastNDays } from '../data/select'
 import { useDisplayName, withName } from '../lib/name'
 import { usePrefs } from '../lib/prefs'
+import { MIN_DAYS, effortFor, effortStatus, effortTarget, statusText } from '../lib/effort'
 import { healthMonitor, monitorSummary } from '../lib/health'
 import { bankText, clockFromNorm, sleepCoach } from './sleepLogic'
 import { bodyBatteryNow, deltaVs7, greetingFor, headlineFor, intensityWeek, latestActivity, recoveryFor, weekGrid, whenLabel } from '../lib/homeLogic'
@@ -71,6 +72,23 @@ function WeekStrip({ days, activities, asOf }) {
   </Card>
 }
 
+function EffortRow({ eff, target, recScore }) {
+  const { score, reason, n } = eff, scored = score != null
+  if (reason === 'history' && n === 0) return null
+  const status = effortStatus(score, target), range = target ? `${target.lo}–${target.hi}` : null
+  const name = scored ? (range ? `${score} · target ${range}` : `${score}`) : reason === 'no-data' ? 'Nothing synced for today yet' : `Effort builds after ${MIN_DAYS} days`
+  const sub = scored ? (target ? statusText(status, true) : 'Target needs a recovery score')
+    : reason === 'no-data' ? (target ? `Today’s target ${range} from recovery ${recScore}` : 'Sync to see today’s effort') : `${n} of ${MIN_DAYS} days so far`
+  return <a className="home-act home-effort" href="#/reports/effort">
+    <span className="home-act-ico"><Icon name="gauge" size={22} /></span>
+    <span className="home-act-text"><span className="home-act-label">Effort today</span>
+      <span className="home-act-name">{name}</span>
+      <span className="home-act-sub">{sub}</span>
+      {scored && <span className="eff-bar" aria-hidden="true">{target && <i className="eff-zone" style={{ left: `${target.lo}%`, width: `${target.hi - target.lo}%` }} />}<i className="eff-fill" style={{ width: `${score}%` }} /></span>}</span>
+    <Icon name="chevron-right" size={18} />
+  </a>
+}
+
 function TonightRow({ coach }) {
   const p = coach.plan, bed = clockFromNorm(p.bedNorm), wake = clockFromNorm(p.wakeNorm)
   return <a className="home-act home-tonight" href="#/sleep">
@@ -91,6 +109,8 @@ export default function Today() {
   useSyncToast()
   const has = Object.keys(days).length > 0 || activities.length > 0
   const rec = useMemo(() => recoveryFor(days, asOf, { sleepNeedHours }), [days, asOf, sleepNeedHours])
+  const eff = useMemo(() => effortFor(days, activities, asOf), [days, activities, asOf])
+  const target = effortTarget(rec.score)
   const insights = useMemo(() => { try { return computeInsights(days, activities, { asOf }).slice(0, 2) } catch { return [] } }, [days, activities, asOf])
   const vitals = useMemo(() => { const m = healthMonitor(days, asOf); return { m, s: monitorSummary(m) } }, [days, asOf])
   const coach = useMemo(() => sleepCoach(days, { prefHours: sleepNeedHours, wakeClock: wakeTime }), [days, asOf, sleepNeedHours, wakeTime])
@@ -135,6 +155,8 @@ export default function Today() {
         {rec.score != null && <a className="home-hero-link" href="#/reports/recovery"><span>What moved it</span><Icon name="chevron-right" size={18} /></a>}
       </div>
     </Card>
+
+    <EffortRow eff={eff} target={target} recScore={rec.score} />
 
     {vitals.s && <a className={`home-act home-vitals is-${vitals.s.tone}`} href="#/reports/health">
       <span className="home-act-ico"><Icon name="shield" size={22} /></span>

@@ -54,6 +54,7 @@ src/
     metrics.js           METRIC REGISTRY + sleep-stage / stress-level palettes + delta rules
     insights.js          personal insight detectors
     homeLogic.js         Today/Morning logic (recovery estimate + breakdown, week grid, deltas)
+    effort.js            effort score: training load + everyday steps against your own 28-day usual; daily target from recovery
     health.js            health monitor: overnight vitals against your own 30-night normal range
     activities.js        activity helpers (type groups, pace, training effect, load)
     name.js              greeting-name resolution (local override, ignores Garmin UUIDs)

@@ -107,7 +107,7 @@ export function WeekdayBars({ data, hue = 'steps', label, format = v => fmtNumbe
 /**
  * Compact single-series chart with its own label (TrendChart takes its label from the registry).
  *  data [{date,value,...}] · kind line|area|bar · domain [lo,hi] fixed · refLine { value, label } · line2 key of a second dashed series
- *  rangeBand { low, high, flag, label } per-point shaded band: keys of the low/high numbers on each row, `flag` key marks points to dot, label for the tooltip
+ *  rangeBand { low, high, flag, label, step? } per-point shaded band: keys of the low/high numbers on each row, `flag` key marks points to dot, label for the tooltip, step draws it as steps (one level per day) instead of sloping between days
  */
 export function MiniTrend({ data, label, hue = 'steps', kind = 'line', height = 120, format = v => fmtNumber(v), domain, refLine, band, rangeBand, line2, line2Label = 'Average', xFormat, axisFormat, tipTitle, ariaLabel }) {
   const t = useChartTheme()
@@ -140,7 +140,7 @@ export function MiniTrend({ data, label, hue = 'steps', kind = 'line', height = 
         {band && <ReferenceArea y1={band.low} y2={band.high} fill={color} fillOpacity={.12} stroke="none" ifOverflow="hidden" label={band.label ? { value: band.label, position: 'insideTopLeft', fill: t.text2, fontSize: 11, fontFamily: t.fontUi } : undefined} />}
         {refLine && num(refLine.value) && <ReferenceLine y={refLine.value} stroke={t.text2} strokeDasharray="4 4" strokeWidth={1} label={refLabel(refLine.label, 'insideTopRight', t)} />}
         <Tooltip content={<Tip />} cursor={kind === 'bar' ? { fill: t.grid } : { stroke: t.text3, strokeWidth: 1 }} isAnimationActive={false} wrapperStyle={{ outline: 'none', zIndex: 5 }} />
-        {rangeBand && <Area type="linear" dataKey={p => num(p[rangeBand.low]) && num(p[rangeBand.high]) ? [p[rangeBand.low], p[rangeBand.high]] : null} stroke="none" fill={color} fillOpacity={.14} connectNulls={false} isAnimationActive={false} dot={false} activeDot={false} />}
+        {rangeBand && <Area type={rangeBand.step ? 'step' : 'linear'} dataKey={p => num(p[rangeBand.low]) && num(p[rangeBand.high]) ? [p[rangeBand.low], p[rangeBand.high]] : null} stroke="none" fill={color} fillOpacity={.14} connectNulls={false} isAnimationActive={false} dot={false} activeDot={false} />}
         {kind === 'bar' ? <Bar dataKey="value" fill={color} maxBarSize={24} radius={[4, 4, 0, 0]} isAnimationActive={false} />
           : kind === 'area' ? <Area type="linear" fill={color} fillOpacity={.1} {...common} /> : <Line type="linear" {...common} />}
         {line2 && <Line dataKey={line2} type="linear" stroke={t.text3} strokeWidth={1.5} strokeDasharray="4 4" dot={false} activeDot={false} connectNulls={false} isAnimationActive={false} />}

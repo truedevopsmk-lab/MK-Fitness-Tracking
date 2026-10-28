@@ -5,6 +5,7 @@ import { mean, sum } from '../lib/stats'
 import { fmtNumber } from '../lib/format'
 import { addDays, today } from '../lib/dates'
 import { recoverySeries } from '../lib/homeLogic'
+import { effortSeries } from '../lib/effort'
 import { MIN_NIGHTS, healthMonitor } from '../lib/health'
 import { usePrefs } from '../lib/prefs'
 import Sparkline from '../charts/Sparkline'
@@ -25,6 +26,7 @@ const REPORTS = [
   { id: 'hr', title: 'Heart rate', icon: 'heart', hue: 'heart', to: '#/reports/heart-rate', desc: 'Resting heart rate and daily range', key: 'restingHr', label: 'avg resting', unit: ' bpm' },
   { id: 'act', title: 'Activities', icon: 'activity', hue: 'intensity', to: '#/reports/activities', desc: 'Workouts by type, time and distance', custom: 'act' },
   { id: 'load', title: 'Training load', icon: 'flame', hue: 'intensity', to: '#/reports/training-load', desc: 'Load, intensity minutes and balance', custom: 'load' },
+  { id: 'effort', title: 'Effort', icon: 'gauge', hue: 'intensity', to: '#/reports/effort', desc: 'Daily effort against a target from your recovery', custom: 'effort', label: 'avg effort' },
   { id: 'rec', title: 'Recovery', icon: 'battery', hue: 'readiness', to: '#/reports/recovery', desc: 'Recovery estimate, sleep, HRV and Body Battery together', custom: 'rec', label: 'avg recovery' },
   { id: 'health', title: 'Health monitor', icon: 'shield', hue: 'heart', to: '#/reports/health', desc: 'Resting HR, HRV and breathing against your normal range', custom: 'health' },
 ]
@@ -37,8 +39,9 @@ function useCards() {
       const m = healthMonitor(days, today())
       value = m.total ? `${m.total - m.outside} of ${m.total}` : null; sub = 'vitals in your normal range'; vitals = m.vitals
       if (m.pending.some(x => x.reason === 'no-range')) emptyText = `Range builds after ${MIN_NIGHTS} nights`
-    } else if (r.key || r.custom === 'rec') {
-      series = r.key ? lastNDays(days, r.key, 7) : recoverySeries(days, addDays(today(), -6), today(), { sleepNeedHours })
+    } else if (r.key || r.custom === 'rec' || r.custom === 'effort') {
+      const from = addDays(today(), -6)
+      series = r.key ? lastNDays(days, r.key, 7) : r.custom === 'effort' ? effortSeries(days, acts, from, today(), { sleepNeedHours }).map(x => ({ date: x.date, value: x.value })) : recoverySeries(days, from, today(), { sleepNeedHours })
       const avg = mean(series.map(p => p.value))
       value = avg == null ? null : `${fmtNumber(Math.round(avg))}${r.unit || ''}`
       const n = series.filter(p => p.value != null).length

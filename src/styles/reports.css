@@ -87,6 +87,10 @@
 .rb-foot a { color: var(--accent-text); }
 .rb-ctx-val { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
 
+/* Effort */
+.ef-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.ef-parts { margin-top: 14px; border-top: 1px solid var(--border); }
+
 /* Health monitor */
 .rp-callout.is-neutral { border-left-color: var(--border-strong); }
 .hm-vitals { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }

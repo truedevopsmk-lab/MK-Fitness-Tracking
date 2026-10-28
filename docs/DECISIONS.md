@@ -81,6 +81,13 @@ Why things are the way they are. Read before "fixing" something that looks odd.
   same-record, not next-day.
 - **Greeting name ignores Garmin IDs.** Garmin's `displayName` is often a UUID. A local override
   (Settings → Profile) wins; otherwise a human-looking Garmin name; otherwise no name.
+- **Effort is relative to your own previous 28 days.** Points = training load + 2 per 1,000 steps
+  outside workouts (so a 10k-step day is about a light 20-load workout), scored as
+  `100 × (1 − 2^(−points / usual))`: a usual day is 50, twice usual about 75, and the curve
+  saturates so it never reaches 100. The usual is floored at 10 so a near-zero history cannot inflate
+  every day, and it needs 14 days of data before any score shows. The daily target (60–80, 40–60,
+  20–40) reuses the recovery headline cut points (75 and 50). It is not in the metric registry because
+  it needs activities and history, same as the recovery estimate. Copy calls it an estimate, not a Garmin number.
 
 ## UI
 

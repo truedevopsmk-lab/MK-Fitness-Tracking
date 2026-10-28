@@ -37,7 +37,7 @@ const REPORTS = {
   stress: page(() => import('./pages/reports/Stress')), 'body-battery': page(() => import('./pages/reports/BodyBattery')),
   hrv: page(() => import('./pages/reports/Hrv')), 'heart-rate': page(() => import('./pages/reports/HeartRate')),
   steps: page(() => import('./pages/reports/Steps')), recovery: page(() => import('./pages/reports/Recovery')),
-  health: page(() => import('./pages/reports/Health')),
+  health: page(() => import('./pages/reports/Health')), effort: page(() => import('./pages/reports/Effort')),
   activities: page(() => import('./pages/reports/ActivitiesReport')), 'training-load': page(() => import('./pages/reports/TrainingLoad')),
 }
 const Kit = import.meta.env.DEV ? page(() => import('./pages/Kit')) : null
