@@ -1,11 +1,9 @@
 // Count rendered data marks in each recharts surface at a normal phone viewport (no resizing).
-import { createRequire } from 'node:module'
+import { launch } from './browser.mjs'
 import { createServer } from 'vite'
-const require = createRequire(import.meta.url)
-const { chromium } = require('/Users/muthukumar/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core')
 const server = await createServer({ root: process.argv[2], cacheDir: '/tmp/mkfit/vite-cache-chk', server: { port: 0 }, logLevel: 'error' })
 await server.listen(); const base = server.resolvedUrls.local[0]
-const b = await chromium.launch({ channel: 'chrome' })
+const b = await launch()
 for (const r of process.argv.slice(3)) {
   const p = await (await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 })).newPage()
   await p.addInitScript(() => localStorage.setItem('mk_fitness_prefs', JSON.stringify({ installDismissed: true, autoSync: false })))

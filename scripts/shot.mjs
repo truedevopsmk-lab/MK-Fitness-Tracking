@@ -5,13 +5,10 @@
 // @empty = real (empty) DB with a fake session, no demo data.
 // Themes: @night (default) @day @color. @desktop = 1280×900, otherwise iPhone 390×844 @2x.
 // Prints console errors / page errors per route. Exit code 1 if any route threw.
-import { createRequire } from 'node:module'
+import { launch } from './browser.mjs'
 import { mkdirSync } from 'node:fs'
 import { createServer } from 'vite'
 
-const require = createRequire(import.meta.url)
-const PW = process.env.PLAYWRIGHT_CORE || '/Users/muthukumar/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core'
-const { chromium } = require(PW)
 
 const [outDir = '/tmp/mkfit/shots', ...routes] = process.argv.slice(2)
 mkdirSync(outDir, { recursive: true })
@@ -21,7 +18,7 @@ const cacheDir = `/tmp/mkfit/vite-cache-${process.env.SHOT_NAME || 'default'}`
 const server = await createServer({ cacheDir, server: { port: 0, strictPort: false }, logLevel: 'error', clearScreen: false })
 await server.listen()
 const base = server.resolvedUrls.local[0] // includes the /unified-pwa/ base
-const browser = await chromium.launch({ channel: 'chrome' })
+const browser = await launch()
 let failed = false
 
 for (const spec of routes.length ? routes : ['#/']) {

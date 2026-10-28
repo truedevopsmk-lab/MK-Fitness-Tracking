@@ -1,9 +1,7 @@
 // Render public/icon.svg to the PNG icons the manifest and iOS need.  node scripts/make-icons.mjs
-import { createRequire } from 'node:module'
+import { launch } from './browser.mjs'
 import { readFileSync } from 'node:fs'
 
-const require = createRequire(import.meta.url)
-const { chromium } = require(process.env.PLAYWRIGHT_CORE || '/Users/muthukumar/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core')
 const root = new URL('../public/', import.meta.url).pathname
 const svg = readFileSync(`${root}icon.svg`, 'utf8')
 const inner = svg.replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '').replace(/<rect[^>]*\/>\s*/, '')
@@ -14,7 +12,7 @@ const bleed = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><re
 const apple = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#071014"/><g transform="translate(256 256) scale(.92) translate(-256 -256)">${inner}</g></svg>`
 const jobs = [['icon-192.png', 192, tile], ['icon-512.png', 512, tile], ['icon-maskable-512.png', 512, bleed], ['apple-touch-icon.png', 180, apple]]
 
-const browser = await chromium.launch({ channel: 'chrome' })
+const browser = await launch()
 for (const [file, size, markup] of jobs) {
   const page = await browser.newPage({ viewport: { width: size, height: size }, deviceScaleFactor: 1 })
   await page.setContent(`<style>html,body{margin:0;background:transparent}svg{display:block;width:${size}px;height:${size}px}</style>${markup}`)

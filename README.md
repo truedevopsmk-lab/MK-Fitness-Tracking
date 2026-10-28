@@ -15,7 +15,7 @@ sent anywhere else.
 | **Reports** | Garmin-style reports: stress, Body Battery, HRV, heart rate, steps, activities, training load (acute vs chronic), recovery. |
 | **Insights** | Plain-language patterns from your own data, each with its sample size. Trends, not medical advice. |
 | **Sync Center** | Latest / full sync, live progress, per-endpoint status, retry failed, cancel, rate-limit countdown, sync log. |
-| **Settings** | Theme (night / day / color / auto), sync preferences, JSON + CSV export, JSON import, optional Face ID / PIN lock, clear local data, sign out. |
+| **Settings** | Your name (local), theme (night / day / color / auto), sync preferences, JSON + CSV export, JSON import, optional Face ID / PIN lock, clear local data, sign out. |
 
 ## Run locally
 
@@ -36,7 +36,7 @@ npm run build
 
 `scripts/shot.mjs` screenshots any route with demo data at iPhone size
 (`node scripts/shot.mjs /tmp/shots '#/' '#/sleep@day' '#/trends/steps@desktop'`). It needs
-Google Chrome and a cached `playwright-core` (set `PLAYWRIGHT_CORE` to its path).
+Google Chrome installed.
 
 ## How sync works
 
@@ -49,7 +49,18 @@ Google Chrome and a cached `playwright-core` (set `PLAYWRIGHT_CORE` to its path)
   Garmin API key" are normal and are not errors. **Retry failed** re-fetches only the failed date ranges.
 - Data from v1 of this app is migrated automatically on first launch.
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the data model and code layout.
+## Documentation
+
+| Doc | Read it when |
+|---|---|
+| [`CLAUDE.md`](CLAUDE.md) / [`AGENTS.md`](AGENTS.md) | you (or an AI assistant) start working on the code — rules + commands |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | you need to know how it fits together: data model, store, sync engine, routes, design system |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | setting up a machine, running tests and screenshots, debugging |
+| [`docs/RECIPES.md`](docs/RECIPES.md) | adding a metric, Garmin endpoint, page, report, insight, setting or theme colour |
+| [`docs/GARMIN-API.md`](docs/GARMIN-API.md) | touching sync or parsing — endpoints, response quirks, rate limits |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | deploying, previewing a branch, rolling back, the Worker, hosting your own copy |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | something looks odd — it may be deliberate |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | picking the next thing to build; known gaps and tech debt |
 
 ## Publish with GitHub Pages
 
@@ -82,3 +93,4 @@ npx wrangler deploy
 ## Install on iPhone
 
 Open the site in Safari → Share → **Add to Home Screen**, then launch it from the icon.
+Set your name under Settings → Profile (Garmin often reports an internal ID instead of a name).

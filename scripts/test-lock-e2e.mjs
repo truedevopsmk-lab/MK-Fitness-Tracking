@@ -1,12 +1,10 @@
 // End-to-end check of the PIN lock in Chrome (demo data): exact-length submit + wrong-PIN throttle.
-import { createRequire } from 'node:module'
+import { launch } from './browser.mjs'
 import assert from 'node:assert/strict'
 import { createServer } from 'vite'
-const require = createRequire(import.meta.url)
-const { chromium } = require(process.env.PLAYWRIGHT_CORE || '/Users/muthukumar/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core')
 const server = await createServer({ cacheDir: '/tmp/mkfit/vite-cache-lock', server: { port: 0 }, logLevel: 'error' })
 await server.listen()
-const browser = await chromium.launch({ channel: 'chrome' })
+const browser = await launch()
 const page = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage()
 await page.goto(`${server.resolvedUrls.local[0]}?demo=1#/`, { waitUntil: 'networkidle' })
 // set a 6-digit PIN through the real module, then reload (cold start locks)

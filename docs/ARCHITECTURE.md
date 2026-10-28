@@ -1,268 +1,264 @@
-# MK Fitness — v2 architecture contract
+# Architecture
 
-This file is the contract between everyone working on the app. If you need to
-change a contract (a shape, a route, a token name), say so in your report —
-do not silently diverge.
+How MK Fitness is put together. For step-by-step changes see [RECIPES.md](RECIPES.md); for the
+reasons behind the choices see [DECISIONS.md](DECISIONS.md).
 
-## Stack & rules
+## Big picture
 
-- Vite 7 + React 19 + recharts 3 + vite-plugin-pwa. **No new runtime dependencies**
-  without a strong reason (state it in your report). No router library, no CSS
-  framework, no state library.
-- Plain `.jsx`/`.js`. Relative imports with explicit extensions inside `src/lib`,
-  `src/data`, `src/state` (so Node can unit-test them). Components may omit `.jsx`.
-- Code style: match the existing code — compact, functional components, hooks,
-  2-space indent, single quotes, no semicolons. Comments only where non-obvious.
-- **All day keys are local `YYYY-MM-DD` strings from `src/lib/dates.js`.** Never use
-  `toISOString().slice(0,10)` — it shifts the day in IST.
-- UI never reads raw Garmin JSON. Only the normalised shapes in `src/data/schema.js`.
-- Every metric shown anywhere goes through the registry in `src/lib/metrics.js`
-  (`METRICS[key].label/format/pick/hue/...`). Add a key there rather than
-  hard-coding a label.
-- Copy tone: plain, calm, sentence case. Insights are trends, never diagnoses
-  ("Your HRV has been below its recent baseline for 4 days", never "you are sick").
+```
+ iPhone / browser (static PWA from GitHub Pages)                 Cloudflare            Garmin
+┌──────────────────────────────────────────────────────────┐   ┌───────────┐   ┌──────────────────┐
+│ pages ── useStore ── store.js ◀── engine.js ── garmin.js ─┼──▶│  Worker   │──▶│ personal.connect │
+│   │                    │            │    normalize.js     │   │ (CORS     │   │ api.garmin.com   │
+│   │                    ▼            ▼                     │   │  proxy)   │   └──────────────────┘
+│   └── lib/* ◀──── IndexedDB (days, activities, meta)      │   └───────────┘
+│        (stats, metrics, insights)   localStorage (prefs, token, lock)
+└──────────────────────────────────────────────────────────┘
+```
+
+- **No backend.** GitHub Pages serves static files. Garmin blocks browser requests (no CORS), so all
+  Garmin calls go through `worker/garmin-proxy.js`, which forwards the request and adds CORS headers.
+  In development Vite's proxy (`/garmin-api` in `vite.config.js`) does the same job.
+- **Local-first.** Everything is cached in IndexedDB; the app renders cached data immediately and a
+  sync only merges new values in. It works offline (service worker caches the app shell).
+- **Demo mode** (`?demo=1`) uses a separate database seeded with generated data, so the app can be
+  developed and screenshot-tested without a Garmin key.
 
 ## Directory layout
 
 ```
 src/
-  main.jsx                 boot: init store, render <App/>
-  App.jsx                  shell: header, bottom nav, route switch, lock gate, toasts
-  lib/                     pure helpers (dates, format, stats, csv, metrics, prefs, insights)
-  data/                    schema, db (IndexedDB), merge, normalize, migrate, demo, select, portable
-  state/store.js           central store + actions (useStore / actions / getState)
-  sync/                    garmin.js (HTTP), endpoints.js (registry), engine.js (orchestrator)
-  router.js                hash router: useRoute(), navigate(), href()
-  components/              shared UI kit (see "UI kit" below)
-  charts/                  recharts wrappers (TrendChart, Sparkline, StackedBars, ...)
-  pages/                   one file per route (+ pages/reports/*)
-  styles/                  tokens.css, base.css, components.css, + one css file per page area
-worker/                    Cloudflare Worker — DO NOT MODIFY
+  main.jsx               boot: apply theme, await actions.init(), render <App/>
+  App.jsx                shell: header, nav (bottom on phones / top ≥900px), route switch, lock gate,
+                         connect gate, pull-to-refresh, auto-sync on open, not-found page
+  router.js              hash router: useRoute(), navigate(), href(), setParams()
+  state/store.js         the single app store + actions (no library)
+  sync/
+    garmin.js            HTTP client: token exchange, session, request(), GarminError
+    endpoints.js         registry of Garmin endpoints (path, kind, chunking, normalize)
+    engine.js            sync orchestrator: plan → run sequentially → merge → status
+  data/
+    schema.js            JSDoc typedefs of the normalised data model (the contract)
+    normalize.js         Garmin JSON → schema shapes (defensive; never throws)
+    merge.js             merge rules (null never overwrites; nothing is deleted)
+    db.js                IndexedDB wrapper (real + demo databases)
+    select.js            read helpers over the day map (latestValue, metricSeries, …)
+    migrate.js           one-time import of v1 cached data
+    portable.js          JSON export/import + CSV builders
+    demo.js              deterministic 400-day demo data generator
+  lib/
+    dates.js             local day-key helpers (the only date code to use)
+    format.js            number / duration / date formatting (en-IN)
+    stats.js             mean, bucketing, summaries, rolling baseline, correlation
+    metrics.js           METRIC REGISTRY + sleep-stage / stress-level palettes + delta rules
+    insights.js          personal insight detectors
+    homeLogic.js         Today/Morning logic (recovery estimate, week grid, deltas)
+    activities.js        activity helpers (type groups, pace, training effect, load)
+    name.js              greeting-name resolution (local override, ignores Garmin UUIDs)
+    prefs.js             UI preferences in localStorage + usePrefs()
+    lock.js              optional Face ID / PIN app lock
+    csv.js               CSV + file download helpers
+  components/            UI kit (Card, StatTile, Ring, Sheet, RangeTabs, …) — see "UI kit"
+  charts/                TrendChart, StackedBars, Sparkline, chartTheme, ChartParts
+  pages/                 one file per route; pages/reports/* for the report pages
+                         *Logic.js next to a page = its pure, unit-tested logic
+  styles/                tokens.css (all colours) · base.css · components.css · one css per page area
+scripts/                 Node tests (test-*.mjs), screenshot + chart tools, icon generator
+worker/                  Cloudflare Worker (Garmin proxy) — rarely changes
+public/                  icons
 ```
 
-## Data flow
+## Data model (`src/data/schema.js`)
 
-```
-Garmin ──garmin.js──▶ engine.js ──normalize.js──▶ actions.applyDays / applyActivities
-                                                     │ (merge.js: never deletes)
-                                                     ▼
-                                   store (memory) + IndexedDB (days/activities/meta)
-                                                     │
-                                  useStore(selector) + data/select.js + lib/stats.js
-                                                     ▼
-                                                   pages
-```
+Everything is keyed by **local calendar day** (`'YYYY-MM-DD'`, see `lib/dates.js`).
 
-Cached data is always rendered; syncing only merges new values in.
+- **DayRecord** — one per day, made of optional sections, each optional field possibly `null`:
+  `steps`, `stress`, `bodyBattery`, `sleep`, `hrv`, `heartRate`, `intensity`, `readiness`, `weight`,
+  `training` (derived from that day's activities, never fetched).
+- **Activity** — normalised activity summary (`id`, `type`, `day`, `startTs`, durations, distance,
+  HR, training load/effect, HR zones, `raw` = original Garmin JSON for the detail page).
+- **Profile** — `displayName`, `fullName`, `timeZone`, `stepGoal`, `sleepNeedSec`.
 
-### Store (`src/state/store.js`)
+Conventions: durations in seconds (`…Sec`), distances in metres (`…M`), instants as epoch ms (`…Ts`).
+**Sleep belongs to the day you woke up** (Garmin's `calendarDate` convention), so "stress on the day
+after a poor night" is the *same* record as that night.
 
-State: `ready, source ('garmin'|'demo'), days, activities, profile, syncMeta, endpoints, sync, log`.
-Actions: `init, applyDays, applyActivities, setProfile, setSync, resetSync, setEndpoint,
-setSyncMeta, log, importData, clearLocalData, switchSource`. Read the file for details.
+## Store (`src/state/store.js`)
 
-`syncMeta = { lastSuccessAt, lastAttemptAt, lastFullAt, lastResult: 'ok'|'partial'|'failed'|'cancelled'|null, lastError, coverage: { first, last } | null }`
+One plain object with subscribers; read with `useStore(selector)`, write only through `actions`.
 
-`sync` (live progress) = `{ running, mode: 'full'|'incremental'|'retry', phase, done, total, current, startedAt, rateLimitedUntil, message }`
-— `done/total` count *requests*, `current` is the endpoint id in flight.
+| State | Meaning |
+|---|---|
+| `ready` | cached data loaded |
+| `source` | `'garmin'` or `'demo'` (header shows a DEMO chip) |
+| `days` | `{ 'YYYY-MM-DD': DayRecord }` |
+| `activities` | `Activity[]`, newest first |
+| `profile` | `Profile` |
+| `syncMeta` | `{ lastSuccessAt, lastAttemptAt, lastFullAt, lastResult, lastError, coverage }` |
+| `endpoints` | `{ [endpointId]: EndpointStatus }` (see Sync) |
+| `sync` | live progress `{ running, mode, phase, done, total, current, rateLimitedUntil, message }` |
+| `log` | last 200 sync log lines |
 
-`endpoints[id]` = **EndpointStatus**
-```
-{ status: 'idle'|'queued'|'running'|'ok'|'empty'|'partial'|'failed'|'unavailable'|'cancelled',
-  lastOkAt, lastAttemptAt, error, httpStatus, requests, failedRequests,
-  records,            // days/activities written in the last run
-  failedRanges,       // [[from,to] | [date,date]] still to retry
-  coverage: { first, last } | null }
-```
-- `empty` = Garmin answered OK with no data ("Garmin has no data for this yet").
-- `unavailable` = 401/403/404 — endpoint not exposed to this API key; skip on future
-  incremental syncs, keep it listed with that explanation.
-- `partial` = some chunks failed; `failedRanges` lists them; "Retry failed" re-runs only those.
+Actions: `init`, `applyDays`, `applyActivities`, `setProfile`, `setSync`, `resetSync`, `setEndpoint`,
+`setSyncMeta`, `log`, `importData`, `clearLocalData`, `switchSource`.
 
-### Demo mode
+> **Selector rule:** a selector must return an existing reference or a primitive
+> (`useStore(s => s.days)`). Building a new object/array inside it re-renders forever.
+> Derive with `useMemo` instead.
 
-`?demo=1` (or Settings → Data source → Demo) uses a separate IndexedDB (`mk-fitness-demo`)
-seeded by `src/data/demo.js` → `generateDemo()` returning `{ days, activities, profile }`
-(400 days, realistic correlated values, a few deliberate gaps). The header always shows
-a **DEMO DATA** chip in demo mode. Sync is disabled in demo mode (Sync Center explains why).
-This is also how the app is screenshot-tested without a Garmin key.
+## Persistence
+
+| Where | Key | What |
+|---|---|---|
+| IndexedDB `garmin-personal-dashboard` (v2) | store `days` (keyPath `date`) | DayRecords |
+| | store `activities` (keyPath `id`) | Activities |
+| | store `meta` | `profile`, `syncMeta`, `endpoints`, `log` |
+| | store `data` | legacy v1 blobs — migrated then cleared by `migrate.js` |
+| IndexedDB `mk-fitness-demo` | same stores | demo data only |
+| localStorage | `garmin_dashboard_session` | `{ accessToken, expiresAt }` — the API key itself is never stored |
+| | `mk_fitness_prefs` | UI preferences (`lib/prefs.js` `DEFAULT_PREFS`) incl. local `displayName` |
+| | `mk_fitness_source` | `'garmin'` / `'demo'` |
+| | `mk_fitness_lock`, `mk_fitness_lock_fails` | lock credential id or salted PIN hash; wrong-PIN throttle |
+| | `mk_fitness_theme` | legacy v1 theme (read once into prefs) |
+
+To change the data model: add optional fields (never rename), bump nothing for additive changes.
+For a breaking change bump `VERSION` in `db.js` and `SCHEMA_VERSION` in `schema.js`, add an upgrade
+path, and teach `portable.js parseImport` to accept the old format.
 
 ## Sync (`src/sync/`)
 
-- `garmin.js` — HTTP only. `request(path, params, { signal })` → parsed JSON or
-  `null` for 204/empty body. Throws `GarminError { status, path, retryAfterMs, kind }`
-  with `kind ∈ 'auth'|'not-found'|'rate-limit'|'server'|'network'|'aborted'|'session'`.
-  Keeps `tokenFromApiKey`, `session`, `signOut` (token in localStorage; API key never stored).
-  Session expiry check uses JWT `exp` if decodable, else the 23 h fallback.
-- `endpoints.js` — registry. Each endpoint:
-  `{ id, label, group, kind: 'range'|'perDay'|'paged'|'single', path(from,to|date), params?,
-     chunkDays?, maxDays?, normalize(json, ctx) → { days?: {date: partial}, activities?: [], profile? },
-     experimental?: true }`
-- `engine.js` — `startSync('full'|'incremental')`, `retryFailed()`, `retryEndpoint(id)`, `cancelSync()`.
-  Sequential requests (one at a time) with a 250 ms gap; on 429 waits `Retry-After`
-  (or exponential backoff 2 s → 60 s cap), shows a countdown via `sync.rateLimitedUntil`,
-  up to 4 attempts per request; 5xx retried 3×; 401/403/404 → `unavailable` (no retry);
-  network error → retry 2× then mark failed. **Writes each chunk to the store as it arrives**
-  so progress is visible and a cancel keeps everything fetched so far.
-  Incremental window = from `min(lastOkAt per endpoint) − 2 days` (≥ 3 days, ≤ historyDays) to today;
-  full = `prefs.historyDays` for range endpoints, `prefs.perDayDays` for per-day endpoints.
-  Auth/session failure aborts the whole run with a clear "Reconnect Garmin" message.
+**`garmin.js`** — the only code that talks HTTP. `tokenFromApiKey(key)` exchanges the Personal API
+key for a JWT (stored with its `exp`); `request(path, params, { signal })` returns parsed JSON, `null`
+for empty bodies, or throws `GarminError { status, kind, retryAfterMs }` where `kind` is one of
+`auth | not-found | rate-limit | server | network | aborted | session | bad-request`.
 
-### Endpoint list
+**`endpoints.js`** — one entry per Garmin endpoint:
+```js
+{ id, label, group, kind: 'single' | 'paged' | 'range' | 'perDay', path(), params?, chunkDays?,
+  normalize(json, ctx) → { days?: { date: partial }, activities?: [], profile? },
+  fallback?: {...},          // e.g. sleep: per-day call when the range call returns nothing
+  experimental?: true }      // may not be exposed to Personal API keys
+```
 
-Known (already used by v1): profile settings, activities (paged), daily steps (range),
-daily stress (range), body battery reports (range), sleep summaries (range) with per-day
-fallback, HRV (range), weight (range).
+**`engine.js`** — `startSync('incremental' | 'full')`, `retryFailed()`, `retryEndpoint(id)`,
+`cancelSync()`, `maybeAutoSync()`.
+1. `planRequests()` builds an ordered task list. Incremental: from each endpoint's last OK minus 2
+   days (≥ 3 days). Full: `prefs.historyDays` for range endpoints, `prefs.perDayDays` for per-day.
+   Range and per-day tasks run newest → oldest so useful data lands first.
+2. Tasks run **one at a time** with a 250 ms gap (1 s after a rate limit). 429 → wait `Retry-After` or
+   exponential backoff (2 s → 60 s) with a countdown in `sync.rateLimitedUntil`; 5xx retried 3×;
+   network errors retried 2×; 401/403/404 → endpoint marked `unavailable` (except a 401 on a known
+   endpoint before anything succeeded, which means the session is bad and aborts the run).
+3. Each response is normalised and **written to the store immediately**, so progress is visible and a
+   cancel keeps everything fetched so far. After activities change, `training` is recomputed per day.
+4. Four consecutive failures park an endpoint; its remaining ranges go into `failedRanges` for
+   "Retry failed".
+5. `syncMeta.lastSuccessAt` is set for `ok` **and** `partial` runs; auto-sync is throttled on the last
+   attempt too, so a permanently failing endpoint can't trigger a sync on every app open.
 
-**Experimental** (Garmin Connect API paths; may be unavailable to Personal API keys —
-must degrade to `unavailable` without breaking anything): daily user summary
-(`/usersummary-service/usersummary/daily?calendarDate=`, per-day: resting HR, intensity
-minutes, stress buckets, BB charged/drained), training readiness
-(`/metrics-service/metrics/trainingreadiness/{date}`), daily intensity minutes
-(`/usersummary-service/stats/im/daily/{from}/{to}`), daily heart rate
-(`/wellness-service/wellness/dailyHeartRate?date=`). Per-day experimental endpoints
-are probed for the most recent day first; if that returns `unavailable`, skip the rest.
+**EndpointStatus**: `{ status, lastOkAt, lastAttemptAt, error, httpStatus, requests, failedRequests,
+records, failedRanges, coverage }` with `status` ∈ `idle | queued | running | ok | empty | partial |
+failed | unavailable | cancelled`. `empty` = Garmin answered with no data ("Garmin has no data for this
+yet"); `unavailable` = not offered to this API key (skipped on incremental syncs, retried on full).
 
-## Routes (`src/router.js`, hash based — works on GitHub Pages)
+## Routing (`src/router.js`, `src/App.jsx`)
 
-| Hash | Page | Owner |
-|---|---|---|
-| `#/` | Today dashboard | home |
-| `#/morning` | Compact morning check | home |
-| `#/trends` | Metric index | trends |
-| `#/trends/:metric?range=30&g=day&end=YYYY-MM-DD` | Trend page | trends |
-| `#/sleep?date=YYYY-MM-DD` | Sleep detail | sleep |
-| `#/reports` | Report index | reports |
-| `#/reports/:kind?range=30` | stress, body-battery, hrv, steps, heart-rate, recovery | reports |
-| `#/reports/activities`, `#/reports/training-load` | Activities + training load reports | activities |
-| `#/reports/sleep` | redirects to `#/sleep` (the Sleep page *is* the sleep report) | shell |
-| `#/activities` | Activity list | activities |
-| `#/activities/:id` | Activity detail | activities |
-| `#/insights` | Insights | insights |
-| `#/sync` | Sync Center | sync |
-| `#/settings` | Settings, privacy, export/import, lock | portability |
+Hash routes (work on static hosting): `useRoute()` → `{ path, segments, params }`.
 
-`useRoute()` → `{ path, segments, params }`; `navigate(hash)`; `href(path, params)` builds `#/...?...`.
-Bottom nav (mobile) / top nav (≥ 900px): **Today · Trends · Sleep · Reports · More** (More → Insights, Activities, Sync, Settings).
+| Hash | Page file |
+|---|---|
+| `#/` | `pages/Today.jsx` |
+| `#/morning` | `pages/Morning.jsx` |
+| `#/trends`, `#/trends/:metric?range=&g=&end=` | `pages/Trends.jsx`, `pages/TrendDetail.jsx` |
+| `#/sleep?date=&range=` | `pages/Sleep.jsx` (`#/reports/sleep` redirects here) |
+| `#/reports`, `#/reports/:kind?range=` | `pages/Reports.jsx`, `pages/reports/*` (map in `App.jsx` `REPORTS`) |
+| `#/activities`, `#/activities/:id` | `pages/Activities.jsx`, `pages/ActivityDetail.jsx` |
+| `#/insights` | `pages/Insights.jsx` |
+| `#/sync` | `pages/SyncCenter.jsx` |
+| `#/settings` | `pages/Settings.jsx` |
+| `#/__kit` | `pages/Kit.jsx` — UI kit gallery, **dev only** |
+| anything else | not-found page |
+
+Pages are `React.lazy` chunks; recharts loads only with pages that chart. Navigation lists live in
+`App.jsx` (`NAV` = bottom/top bar, `MORE` = the More sheet). Every route is wrapped in an
+`ErrorBoundary`. Controls that change the view (range, granularity, date) write to the URL with
+`navigate(…, { replace: true })` so Back leaves the page instead of undoing each tap.
+
+**Connect gate:** the full-screen Connect page shows only when there is no valid session, no cached
+data and not demo mode. Otherwise cached data renders and an expired session shows a slim banner
+linking to the Sync Center.
+
+## Metric registry (`src/lib/metrics.js`)
+
+`METRICS[key]` = `{ label, short, unit, pick(day), format(v), axis?(v), agg: 'mean'|'sum',
+better: 'up'|'down'|null, hue, domain?, band?(v) → {label, tone}, goal?(day), group, report }`.
+Home tiles, trend pages, reports, CSV export, insights and delta chips all read it, so a new key
+appears everywhere consistently. Also exported: `SLEEP_STAGES`, `STRESS_LEVELS` (validated palettes),
+`isMeaningfulDelta(key, delta)` (noise floor below which a change shows as "Same"), `deltaTone`.
+
+## UI kit (`src/components/`, barrel in `index.js`)
+
+| Component | Use |
+|---|---|
+| `Card` | surface; `title`, `subtitle`, `action`, `href`/`onClick` (whole card tappable), `flush` |
+| `StatTile` | metric tile driven by `metricKey` (label/format/band from registry) + `delta`, `spark`, `href` |
+| `DeltaChip` | signed change with tone + arrow (never colour alone); "Same" under the noise floor |
+| `Ring`, `Meter` | circular score / progress bar |
+| `RangeTabs`, `Segmented`, `DateStepper` | filters (7D…1Y, options, day stepping) |
+| `PageHeader`, `SectionTitle`, `KeyValue`, `DataTable`, `MissingNote` | layout + data display |
+| `Badge`/`StatusPill`, `Button`, `Empty`, `Icon` | basics (`Icon` is an inline SVG set) |
+| `Sheet`, `ConfirmDialog`, `toast()` + `Toaster` | overlays and feedback |
+| `PullToRefresh`, `InstallHint`, `ConnectForm`, `ErrorBoundary`, `LockScreen` | app-level |
+
+Charts (`src/charts/`): `TrendChart` (single series: line/area/bar, goal/baseline lines, shaded band,
+gaps for missing days), `StackedBars` (stacked columns + legend), `Sparkline` (plain SVG, no recharts).
+`pages/reports/ReportLayout.jsx` also exports report building blocks (`ReportLayout`, `useRange`,
+`MiniTrend`, `StackedColumns`, `WeekdayBars`, `TableView`, `HowToRead`, `ReportNote`) — see
+[ROADMAP.md](ROADMAP.md) "chart duplication".
 
 ## Design system
 
-Brand: keep v1's identity — mint `#20c997` accent, dark teal-black night theme, Space Grotesk
-for headings/values, DM Mono for small labels/eyebrows. Body/UI text may use system-ui for
-legibility. Themes: `night` (default), `day`, `color` (violet accent), `auto` (follows OS).
-Theme is a `data-theme` attribute on `<html>`; all colours are CSS custom properties in
-`src/styles/tokens.css`. **Never hard-code a hex in a component or page CSS** — use tokens.
+- **Brand:** mint accent `#20c997`, dark teal-black night theme, Space Grotesk for headings/values,
+  DM Mono for small labels/eyebrows, system UI font for body text.
+- **Themes:** `night` (default), `day`, `color` (violet accent), `auto` (follows the OS). Set as
+  `data-theme` on `<html>`; all colours are CSS custom properties in `styles/tokens.css`.
+- **Token groups:** surfaces (`--bg --surface --surface-2 --surface-hover --border --border-strong`),
+  text (`--text --text-2 --text-3`), accent (`--accent --accent-ink --accent-soft --accent-text`),
+  status (`--good --warning --serious --critical`), metric hues (`--hue-sleep --hue-stress
+  --hue-battery --hue-steps --hue-intensity --hue-readiness --hue-hrv --hue-heart`), chart palettes
+  (`--stage-*`, `--stress-*`), layout (`--radius* --shadow* --nav-h --header-h --safe-*`).
+- **Validated palettes** (colour-blind checked on all three theme surfaces — re-validate before changing):
+  sleep stages deep→light→REM→awake, dark `#3987e5 #199e70 #9085e9 #d95926` / day `#2a78d6 #1baf7a #4a3aa7 #eb6834`;
+  stress rest→high, dark `#1c5cab #3987e5 #6da7ec #b7d3f6` / day `#86b6ef #3987e5 #256abf #104281`.
+  Use at most 4 hues in one chart.
 
-Token names (defined per theme):
-```
---bg  --surface  --surface-2  --surface-hover  --border  --border-strong
---text  --text-2  --text-3          (primary / secondary / muted)
---accent  --accent-ink  --accent-soft  (accent fill, text on accent, 12% wash)
---good  --warning  --serious  --critical   (status — always paired with icon + label)
---hue-sleep --hue-stress --hue-battery --hue-steps --hue-intensity --hue-readiness --hue-hrv --hue-heart
---stage-deep --stage-light --stage-rem --stage-awake
---stress-rest --stress-low --stress-medium --stress-high
---grid  --radius  --radius-sm  --shadow  --safe-top --safe-bottom
---font-display  --font-mono  --font-ui
-```
+**Chart rules** (apply to every chart):
+- 2px lines, area fill ≈10% opacity, bars ≤ 24px with 4px rounded tops, 2px gap between stacked segments.
+- Hairline solid horizontal gridlines only; dashed lines only for labelled reference lines (goal, baseline).
+- **One y-axis per chart — never dual-axis.** Two measures → two charts.
+- Single series: no legend box (the title names it). Two or more: legend.
+- Text uses text tokens, never the series colour.
+- Every chart has a tooltip and a table view (or the numbers elsewhere on the page).
+- Missing days render as gaps (`connectNulls={false}`) and the page says how many are missing.
+- If a shaded band (e.g. HRV balanced range) is drawn, draw the series as a line, not an area.
 
-Validated chart palettes (dataviz validator, all three surfaces — do not change without re-validating):
-- Sleep stages, fixed order deep→light→REM→awake:
-  dark/color `#3987e5 #199e70 #9085e9 #d95926` · day `#2a78d6 #1baf7a #4a3aa7 #eb6834`
-- Stress ordinal rest→high: dark `#1c5cab #3987e5 #6da7ec #b7d3f6` · day `#86b6ef #3987e5 #256abf #104281`
-- Status: good `#0ca30c` warning `#fab219` serious `#ec835a` critical `#d03b3b`
+**Mobile:** bottom nav with safe-area padding, touch targets ≥ 44px (`pointer: coarse`), no
+horizontal scroll at 390px, `prefers-reduced-motion` respected.
 
-Chart rules (from the dataviz method — apply everywhere):
-- Lines 2px, round caps; area fill = series hue at ~10% opacity; bars ≤ 24px thick, 4px
-  rounded top, square base; 2px surface-colour gap between stacked segments.
-- Gridlines: hairline, solid, `var(--grid)`, horizontal only. No dashed grid.
-  Dashed is allowed only for a reference line (goal, baseline) — label it.
-- One y-axis per chart. Never dual-axis. Two measures → two charts.
-- Single-series charts: no legend box (title names it). ≥ 2 series: legend + direct labels.
-- Text never wears the series colour — values/labels use text tokens; a coloured dot/line
-  key beside the text carries identity.
-- Tooltip on every chart (crosshair on line/area, per-bar on bars); value bold, label secondary.
-- Missing days render as gaps (`connectNulls={false}`), and the summary shows "n days missing".
-- Every chart has a table view or the numbers available elsewhere on the page.
-- Refetch/sync never blanks a chart — keep the previous render.
+## PWA
 
-Mobile (iPhone PWA is the primary target):
-- Bottom nav fixed, honours `env(safe-area-inset-bottom)`; header honours `safe-area-inset-top`.
-- Touch targets ≥ 44px. Cards full-width on phones, 2–4 columns on wider screens.
-- `viewport-fit=cover`, `apple-mobile-web-app-status-bar-style=black-translucent`.
-- Respect `prefers-reduced-motion`.
+`vite.config.js` (vite-plugin-pwa): manifest with PNG + maskable icons, `autoUpdate` service
+worker that precaches the app shell (~1 MB) and caches Google Fonts. **Garmin responses are never
+cached by the service worker** — health data lives only in IndexedDB. iOS keeps the previous version
+until the app is closed and reopened once after a deploy.
 
-## UI kit (`src/components/`, owned by the shell agent — others import, don't fork)
+## Security & privacy model
 
-`Card` (`{ title?, subtitle?, action?, href?, onClick?, className?, children }`),
-`StatTile` (`{ metricKey, value, sub?, delta?, deltaKey?, spark?, href?, band? }`),
-`Sparkline` (in `src/charts/`, `{ data: [{date,value}], hue, height=36 }`),
-`Ring` (`{ value, max=100, hue, size, label }`), `Meter` (`{ value, max, hue, label }`),
-`RangeTabs` (`{ value, options:[7,30,60,120,365], onChange }`), `Segmented` (`{ value, options:[{value,label}], onChange }`),
-`DateStepper` (`{ date, onChange, min, max }` ← → buttons + label),
-`Empty` (`{ icon?, title, body?, action? }`), `Badge`/`StatusPill` (`{ tone, children }`),
-`Button` (`{ variant: 'primary'|'secondary'|'ghost'|'danger', size, ...props }`),
-`Sheet` (bottom sheet / modal), `ConfirmDialog` (`{ title, body, confirmLabel, tone, onConfirm, onCancel }`),
-`Toast` via `toast(msg, { tone })` from `src/components/toast.js`,
-`PageHeader` (`{ title, subtitle?, back?, actions? }`), `SectionTitle`, `KeyValue` rows,
-`DataTable` (`{ columns, rows, maxRows? }`), `PullToRefresh` (`{ onRefresh, children }`),
-`MissingNote` (`{ missing, total }` → "3 of 30 days missing").
-
-Charts (`src/charts/`): `TrendChart` (`{ data, metricKey, kind: 'line'|'area'|'bar', goal?, baseline?, height }`),
-`StackedBars` (`{ data, series:[{key,label,color}], height, format? }`), `Sparkline`.
-
-## File ownership (parallel phase)
-
-| Agent | Owns (create/modify) |
-|---|---|
-| sync | `src/sync/**`, `src/data/normalize.js`, `src/data/migrate.js`, `src/pages/SyncCenter.jsx`, `src/styles/sync.css`, `scripts/test-data.mjs` |
-| shell | `index.html`, `src/main.jsx`, `src/App.jsx`, `src/router.js`, `src/components/**` (except LockScreen), `src/charts/**`, `src/styles/{tokens,base,components}.css`, `src/data/demo.js`, `vite.config.js`, `public/**`, `scripts/make-icons.mjs`, `src/pages/{Placeholder,Connect}.jsx` |
-| home | `src/pages/Today.jsx`, `src/pages/Morning.jsx`, `src/styles/home.css` |
-| trends | `src/pages/Trends.jsx`, `src/pages/TrendDetail.jsx`, `src/styles/trends.css` |
-| sleep | `src/pages/Sleep.jsx`, `src/styles/sleep.css` |
-| reports | `src/pages/Reports.jsx`, `src/pages/reports/{ReportLayout,Stress,BodyBattery,Hrv,HeartRate,Steps,Recovery}.jsx`, `src/styles/reports.css` |
-| activities | `src/pages/reports/{ActivitiesReport,TrainingLoad}.jsx`, `src/pages/Activities.jsx`, `src/pages/ActivityDetail.jsx`, `src/styles/activities.css` |
-| insights | `src/lib/insights.js`, `src/pages/Insights.jsx`, `src/styles/insights.css` |
-| portability | `src/pages/Settings.jsx`, `src/data/portable.js`, `src/lib/lock.js`, `src/components/LockScreen.jsx`, `src/styles/settings.css` |
-
-Shared files owned by the lead (`src/lib/{dates,format,stats,csv,metrics,prefs}.js`,
-`src/data/{schema,db,merge,select}.js`, `src/state/store.js`, this doc): if you need a
-change, make the **smallest additive** edit (new export, new metric key) and list it in
-your report. Never rename or remove an existing export.
-
-Each page file default-exports its page component and imports its own CSS file
-(`import '../styles/sleep.css'`).
-
-## Stubs (created by shell in phase 1, replaced by owners in phase 2)
-
-Shell creates every page file in the route table as a stub that default-exports
-`<Placeholder title="…"/>`, so `App.jsx` can wire every route with `React.lazy`
-from day one. Owners overwrite their stub. Also stubbed, with this exact contract:
-
-- `src/lib/lock.js` → `export function useLockState()` returning `{ locked, unlock(), lock() }`
-  (stub: never locked). Handles auto-lock after `prefs.lockAfterMin` in the background.
-- `src/components/LockScreen.jsx` → `export default function LockScreen({ onUnlock })` (stub: renders null).
-- `src/lib/insights.js` → `computeInsights(days, activities, opts)` (already stubbed, returns []).
-- `src/sync/engine.js` exports used by the UI: `startSync(mode)`, `retryFailed()`, `retryEndpoint(id)`,
-  `cancelSync()`, `maybeAutoSync()`; `src/sync/garmin.js` exports `session()`, `isSessionValid()`,
-  `tokenFromApiKey(key)`, `signOut()`. (Written by the sync agent in phase 1.)
-
-`src/components/ConnectForm.jsx` (shell) — API-key form used by the Connect screen and by
-the Sync Center / session-expired flow. Props: `{ onConnected }`.
-
-## Connection model
-
-- No session **and** no cached data **and** not demo → full-screen Connect page
-  (with an "Explore with demo data" link).
-- Otherwise the app always renders cached data. An expired/missing session shows a
-  slim banner "Garmin session expired — reconnect to sync" linking to `#/sync`.
-- Every route is wrapped in an error boundary: a crashing page shows an error card, not a white screen.
-
-## Verifying your work
-
-- Unit tests: `node scripts/test-lib.mjs` (shared libs), plus your own `scripts/test-*.mjs`.
-- Build without clobbering others: `npx vite build --outDir /tmp/mkfit/build-<you> --emptyOutDir`.
-- Screenshots (demo data, no key needed):
-  `SHOT_NAME=<you> node scripts/shot.mjs /tmp/mkfit/shots-<you> '#/sleep' '#/sleep@day' '#/sleep@color' '#/sleep@desktop'`
-  then **open the PNGs with the Read tool and look at them**. Fix overlaps, clipping, empty
-  states, contrast, and anything that looks unfinished. Console errors are printed per route.
+- The API key is used once for the token exchange and never stored or logged.
+- The token lives in localStorage; health data in IndexedDB; both stay on the device.
+- The app lock (WebAuthn platform authenticator or PIN) keeps casual eyes out; it does **not**
+  encrypt data. PINs are stored as salted SHA-256; wrong PINs are throttled (5 free, then 30 s
+  doubling to 15 min, persisted).
+- Exports contain health data but never the token, sync log or lock settings.
+- The Worker forwards any request it receives (it only sets CORS for `ALLOWED_ORIGIN`); Garmin
+  still requires the user's token. See [ROADMAP.md](ROADMAP.md) for hardening.
