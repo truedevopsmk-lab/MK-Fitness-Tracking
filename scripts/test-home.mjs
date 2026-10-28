@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { recoveryFor, weekGrid, intensityWeek, deltaVs7, headlineFor, latestActivity } from '../src/lib/homeLogic.js'
+import { recoveryFor, recoverySeries, weekGrid, intensityWeek, deltaVs7, headlineFor, latestActivity } from '../src/lib/homeLogic.js'
 
 const day = (date, o = {}) => ({ date, ...o })
 const days = {}
@@ -16,4 +16,13 @@ assert.equal(w.length, 7); assert.equal(w[0].date, '2026-10-19'); assert.equal(w
 assert.deepEqual(intensityWeek(days, '2026-10-25'), { total: 50, goal: 150, any: true })
 const d = deltaVs7(days, 'restingHr', '2026-10-24'); assert.ok(d && d.delta < 0)
 assert.equal(latestActivity([{ startTs: 1 }, { startTs: 5 }]).startTs, 5)
+// sleep need comes from the setting when the night has none: 6.5 h is short vs 8 h, fine vs 6.5 h
+const nd = { ...days, '2026-10-24': { ...days['2026-10-24'], readiness: undefined, sleep: { score: 85, durationSec: 6.5 * 3600 } } }
+assert.ok(recoveryFor(nd, '2026-10-24').parts.some(p => p.key === 'short'))
+assert.ok(!recoveryFor(nd, '2026-10-24', { sleepNeedHours: 6.5 }).parts.some(p => p.key === 'short'))
+assert.ok(recoveryFor(nd, '2026-10-24', { sleepNeedHours: 9.5 }).score <= 70)
+// series: one value per day, no carry-over from earlier days
+const rs = recoverySeries(nd, '2026-10-23', '2026-10-25')
+assert.deepEqual(rs.map(p => p.date), ['2026-10-23', '2026-10-24', '2026-10-25'])
+assert.equal(rs[2].value, null); assert.equal(rs[1].value, recoveryFor(nd, '2026-10-24').score)
 console.log('home tests passed')

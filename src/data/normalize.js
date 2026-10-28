@@ -61,6 +61,21 @@ export function firstNumber(value, keys, depth = 0) {
 
 const STAGE_BY_LEVEL = { 0: 'deep', 1: 'light', 2: 'rem', 3: 'awake' }
 
+const SUB_SCORE_KEYS = { totalDuration: 'duration', stress: 'stress', awakeCount: 'awakenings', restlessness: 'restlessness', remPercentage: 'rem', lightPercentage: 'light', deepPercentage: 'deep' }
+
+/** Garmin `sleepScores` components → `{ duration: { value, qualifier, optimalLow, optimalHigh }, … }` or null. */
+function subScoresFrom(scores) {
+  if (!isObj(scores)) return null
+  const out = {}
+  for (const [gk, key] of Object.entries(SUB_SCORE_KEYS)) {
+    const c = scores[gk]
+    if (!isObj(c)) continue
+    const sub = { value: num(c.value), qualifier: pickString(c, ['qualifierKey']), optimalLow: num(c.optimalStart), optimalHigh: num(c.optimalEnd) }
+    if (sub.value != null || sub.qualifier != null) out[key] = sub
+  }
+  return Object.keys(out).length ? out : null
+}
+
 /** One Garmin sleep payload (wrapped `{dailySleepDTO}` or flat) → `{ day, sleep }` or null. */
 export function sleepFrom(raw) {
   if (!isObj(raw)) return null
@@ -84,7 +99,15 @@ export function sleepFrom(raw) {
     avgRespiration: pickNumber(dto, ['averageRespirationValue', 'avgRespirationValue']),
     avgSpo2: pickNumber(dto, ['averageSpO2Value', 'avgSpo2']),
     bodyBatteryChange: pickNumber(raw, ['bodyBatteryChange']) ?? pickNumber(dto, ['bodyBatteryChange']),
+    awakeCount: pickNumber(dto, ['awakeCount']),
+    avgSleepStress: pickNumber(dto, ['avgSleepStress']),
+    lowRespiration: pickNumber(dto, ['lowestRespirationValue']), highRespiration: pickNumber(dto, ['highestRespirationValue']),
+    napSec: pickNumber(dto, ['napTimeSeconds']), unmeasurableSec: pickNumber(dto, ['unmeasurableSleepSeconds']),
+    feedback: pickString(dto, ['sleepScoreFeedback']),
   }
+  if (sleep.avgSleepStress != null && sleep.avgSleepStress < 0) sleep.avgSleepStress = null
+  const subScores = subScoresFrom(scores)
+  if (subScores) sleep.subScores = subScores
   const levels = Array.isArray(raw.sleepLevels) ? raw.sleepLevels : Array.isArray(dto.sleepLevels) ? dto.sleepLevels : []
   const stages = levels.map(l => ({ start: tsOf(l?.startGMT ?? l?.start), end: tsOf(l?.endGMT ?? l?.end), stage: STAGE_BY_LEVEL[Math.round(num(l?.activityLevel))] }))
     .filter(s => s.start != null && s.end != null && s.end > s.start && s.stage).sort((a, b) => a.start - b.start)
@@ -181,7 +204,7 @@ export function userSummaryFrom(row, fallbackDay) {
   if (!isObj(row)) return null
   const day = rowDay(row) ?? fallbackDay
   const out = {}
-  const hr = { resting: pickNumber(row, ['restingHeartRate']), min: pickNumber(row, ['minHeartRate']), max: pickNumber(row, ['maxHeartRate']) }
+  const hr = { resting: pickNumber(row, ['restingHeartRate']), min: pickNumber(row, ['minHeartRate']), max: pickNumber(row, ['maxHeartRate']), resting7d: pickNumber(row, ['lastSevenDaysAvgRestingHeartRate']) }
   const intensity = { moderate: pickNumber(row, ['moderateIntensityMinutes']), vigorous: pickNumber(row, ['vigorousIntensityMinutes']), goal: pickNumber(row, ['intensityMinutesGoal']) }
   const stress = {
     avg: pickNumber(row, ['averageStressLevel']), max: pickNumber(row, ['maxStressLevel']), restSec: pickNumber(row, ['restStressDuration']), lowSec: pickNumber(row, ['lowStressDuration']),
@@ -189,12 +212,22 @@ export function userSummaryFrom(row, fallbackDay) {
   }
   if (stress.avg != null && stress.avg < 0) stress.avg = null
   if (stress.max != null && stress.max < 0) stress.max = null
-  const bb = { high: pickNumber(row, ['bodyBatteryHighestValue']), low: pickNumber(row, ['bodyBatteryLowestValue']), charged: pickNumber(row, ['bodyBatteryChargedValue']), drained: pickNumber(row, ['bodyBatteryDrainedValue']) }
+  const bb = {
+    high: pickNumber(row, ['bodyBatteryHighestValue']), low: pickNumber(row, ['bodyBatteryLowestValue']), charged: pickNumber(row, ['bodyBatteryChargedValue']), drained: pickNumber(row, ['bodyBatteryDrainedValue']),
+    latest: pickNumber(row, ['bodyBatteryMostRecentValue']), atWake: pickNumber(row, ['bodyBatteryAtWakeTime']), duringSleep: pickNumber(row, ['bodyBatteryDuringSleep']),
+  }
+  const respiration = { waking: pickNumber(row, ['avgWakingRespirationValue']), low: pickNumber(row, ['lowestRespirationValue']), high: pickNumber(row, ['highestRespirationValue']), latest: pickNumber(row, ['latestRespirationValue']) }
+  const movement = {
+    activeSec: pickNumber(row, ['activeSeconds']), highlyActiveSec: pickNumber(row, ['highlyActiveSeconds']), sedentarySec: pickNumber(row, ['sedentarySeconds']),
+    activeKcal: pickNumber(row, ['activeKilocalories']), totalKcal: pickNumber(row, ['totalKilocalories']), floors: pickNumber(row, ['floorsAscended']),
+  }
   const steps = { total: pickNumber(row, ['totalSteps']), goal: pickNumber(row, ['dailyStepGoal']), distanceM: pickNumber(row, ['totalDistanceMeters']) }
   if (has(hr)) out.heartRate = hr
   if (has(intensity)) out.intensity = intensity
   if (has(stress)) out.stress = stress
   if (has(bb)) out.bodyBattery = bb
+  if (has(respiration)) out.respiration = respiration
+  if (has(movement)) out.movement = movement
   if (steps.total != null) out.steps = steps
   return day && Object.keys(out).length ? { day, ...out } : null
 }
@@ -213,10 +246,31 @@ export function intensityFrom(row) {
   return day && has(intensity) ? { day, intensity } : null
 }
 
+/** Intraday `heartRateValues` → mean bpm per 10-minute bucket, `[[bucketTs, bpm], …]` ascending. */
+export function hrSamples(row) {
+  if (!isObj(row) || !Array.isArray(row.heartRateValues)) return []
+  const idx = key => Array.isArray(row.heartRateValueDescriptors) ? row.heartRateValueDescriptors.find(d => d?.key === key)?.index : null
+  const ti = num(idx('timestamp')) ?? 0, hi = num(idx('heartrate')) ?? 1
+  const buckets = new Map()
+  for (const v of row.heartRateValues) {
+    if (!Array.isArray(v)) continue
+    const ts = num(v[ti]), bpm = num(v[hi])
+    if (ts == null || bpm == null || bpm <= 0) continue
+    const k = Math.floor(ts / 600000) * 600000, b = buckets.get(k) || [0, 0]
+    b[0] += bpm; b[1] += 1; buckets.set(k, b)
+  }
+  return [...buckets].map(([k, [sum, c]]) => [k, Math.round(sum / c)]).sort((a, b) => a[0] - b[0])
+}
+
 export function heartRateFrom(row, fallbackDay) {
   if (!isObj(row)) return null
   const day = rowDay(row) ?? fallbackDay
-  const heartRate = { resting: pickNumber(row, ['restingHeartRate', 'restingHR']), min: pickNumber(row, ['minHeartRate']), max: pickNumber(row, ['maxHeartRate']) }
+  const heartRate = {
+    resting: pickNumber(row, ['restingHeartRate', 'restingHR']), min: pickNumber(row, ['minHeartRate']), max: pickNumber(row, ['maxHeartRate']),
+    resting7d: pickNumber(row, ['lastSevenDaysAvgRestingHeartRate']),
+  }
+  const samples = hrSamples(row)
+  if (samples.length >= 2) heartRate.samples = samples
   return day && has(heartRate) ? { day, heartRate } : null
 }
 
@@ -262,6 +316,14 @@ export function trainingByDay(activities) {
 export function activitiesFrom(json) {
   const items = Array.isArray(json) ? json : (json?.activities ?? json?.summarizedActivities ?? json?.activityList ?? [])
   return (Array.isArray(items) ? items : []).map(activityFrom).filter(Boolean)
+}
+
+/** Account owner's name from an activities list (`ownerFullName`), else null. */
+export function ownerNameFrom(json) {
+  const items = Array.isArray(json) ? json : (json?.activities ?? json?.activityList ?? [])
+  if (!Array.isArray(items)) return null
+  for (const a of items) if (isObj(a) && typeof a.ownerFullName === 'string' && a.ownerFullName.trim()) return a.ownerFullName.trim()
+  return null
 }
 
 // ---- Profile -----------------------------------------------------------------------------

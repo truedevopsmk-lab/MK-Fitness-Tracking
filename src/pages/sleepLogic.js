@@ -55,7 +55,7 @@ export function buildRows(days, from, to, prefHours = 8) {
       deepPct: pct('deep'), remPct: pct('rem'), startTs: has ? s.startTs ?? null : null, endTs: has ? s.endTs ?? null : null,
       bedMin, wakeMin: wakeMin != null && bedMin != null && wakeMin <= bedMin ? null : wakeMin,
       need, balance: has ? s.durationSec - need : null,
-      restingHr: has ? s.restingHr ?? null : null, hrv: has ? s.avgHrv ?? rec.hrv?.lastNight ?? null : null, bb,
+      restingHr: has ? s.restingHr ?? rec.heartRate?.resting ?? null : null, hrv: has ? s.avgHrv ?? rec.hrv?.lastNight ?? null : null, bb,
     }
   })
 }

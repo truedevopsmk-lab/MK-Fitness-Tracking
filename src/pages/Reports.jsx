@@ -4,6 +4,8 @@ import { lastNDays } from '../data/select'
 import { mean, sum } from '../lib/stats'
 import { fmtNumber } from '../lib/format'
 import { addDays, today } from '../lib/dates'
+import { recoverySeries } from '../lib/homeLogic'
+import { usePrefs } from '../lib/prefs'
 import Sparkline from '../charts/Sparkline'
 import Icon from '../components/Icon'
 import Empty from '../components/Empty'
@@ -21,15 +23,15 @@ const REPORTS = [
   { id: 'hr', title: 'Heart rate', icon: 'heart', hue: 'heart', to: '#/reports/heart-rate', desc: 'Resting heart rate and daily range', key: 'restingHr', label: 'avg resting', unit: ' bpm' },
   { id: 'act', title: 'Activities', icon: 'activity', hue: 'intensity', to: '#/reports/activities', desc: 'Workouts by type, time and distance', custom: 'act' },
   { id: 'load', title: 'Training load', icon: 'flame', hue: 'intensity', to: '#/reports/training-load', desc: 'Load, intensity minutes and balance', custom: 'load' },
-  { id: 'rec', title: 'Recovery', icon: 'battery', hue: 'readiness', to: '#/reports/recovery', desc: 'Readiness, sleep, HRV and Body Battery together', key: 'readiness', label: 'avg readiness' },
+  { id: 'rec', title: 'Recovery', icon: 'battery', hue: 'readiness', to: '#/reports/recovery', desc: 'Recovery estimate, sleep, HRV and Body Battery together', custom: 'rec', label: 'avg recovery' },
 ]
 
 function useCards() {
-  const days = useStore(s => s.days), acts = useStore(s => s.activities)
+  const days = useStore(s => s.days), acts = useStore(s => s.activities), { sleepNeedHours } = usePrefs()
   return useMemo(() => REPORTS.map(r => {
     let series = [], value = null, sub = r.label
-    if (r.key) {
-      series = lastNDays(days, r.key, 7)
+    if (r.key || r.custom === 'rec') {
+      series = r.key ? lastNDays(days, r.key, 7) : recoverySeries(days, addDays(today(), -6), today(), { sleepNeedHours })
       const avg = mean(series.map(p => p.value))
       value = avg == null ? null : `${fmtNumber(Math.round(avg))}${r.unit || ''}`
       const n = series.filter(p => p.value != null).length
@@ -46,7 +48,7 @@ function useCards() {
       }
     }
     return { ...r, series, value, sub }
-  }), [days, acts])
+  }), [days, acts, sleepNeedHours])
 }
 
 export default function Reports() {

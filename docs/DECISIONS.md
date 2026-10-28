@@ -15,6 +15,9 @@ Why things are the way they are. Read before "fixing" something that looks odd.
   tiles, trends, reports, exports and insights consistent and makes adding a metric a one-place change.
 - **Demo mode in a separate database.** Lets development, screenshots and demos run without a Garmin
   key and without any risk to real data.
+- **Demo mirrors a Personal API key.** No readiness, SpO2 or sleep-time HR/HRV, so the screens match
+  what real users see (e.g. the Today hero shows "Recovery estimate"). The hypnogram is kept so the
+  timeline chart stays covered.
 
 ## Sync
 
@@ -40,6 +43,8 @@ Why things are the way they are. Read before "fixing" something that looks odd.
   It blends sleep score with duration vs need (0.4), HRV vs its own 7-day baseline (0.35, plateaus
   above baseline — higher HRV is not "extra" recovery) and Body Battery high (0.25), and is **capped
   after a short night** (> 1 h under need → max 70, > 2.5 h → max 55), as Garmin's readiness is.
+  Need is Garmin's sleep need when present, else Settings → Sleep need. Today, Morning, the Reports
+  tile and the Recovery report all use `recoveryFor` / `recoverySeries`, so they show the same number.
 - **Delta noise floor.** Day-to-day changes like "−0.4" are noise; `isMeaningfulDelta()` turns them
   into "Same". Thresholds per metric in `MIN_DELTA` (`lib/metrics.js`).
 - **Insights are trends with sample sizes**, never causal or medical claims, and stay silent below

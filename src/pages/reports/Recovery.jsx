@@ -1,39 +1,31 @@
 import { useMemo } from 'react'
 import { useStore } from '../../state/store'
 import { metricSeries } from '../../data/select'
-import { eachDay } from '../../lib/dates'
-import { mean, summarize } from '../../lib/stats'
+import { summarize } from '../../lib/stats'
+import { recoverySeries } from '../../lib/homeLogic'
+import { usePrefs } from '../../lib/prefs'
 import { METRICS, hrvStatusBand } from '../../lib/metrics'
 import { fmtDay } from '../../lib/format'
 import Card from '../../components/Card'
 import ReportLayout, { HowToRead, MiniTrend, TableView, rangeBounds, useRange } from './ReportLayout'
 
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
-const hrvPts = (v, a, sd) => v == null || a == null || !sd ? null : clamp(50 + (v - a) / sd * 25, 0, 100)
-
 export default function Recovery() {
-  const days = useStore(s => s.days)
+  const days = useStore(s => s.days), { sleepNeedHours } = usePrefs()
   const [range, setRange] = useRange()
   const { from, to } = useMemo(() => rangeBounds(range), [range])
   const d = useMemo(() => {
-    const ready = metricSeries(days, 'readiness', from, to), sleep = metricSeries(days, 'sleepScore', from, to)
+    const rec = recoverySeries(days, from, to, { sleepNeedHours }), sleep = metricSeries(days, 'sleepScore', from, to)
     const hrv = metricSeries(days, 'hrv', from, to), bb = metricSeries(days, 'bodyBatteryHigh', from, to)
-    const hasReadiness = ready.some(p => p.value != null)
-    // Estimate when Garmin gave no readiness score: equal mix of whatever of sleep score, Body Battery high and HRV (vs own mean) exists that day
-    const hm = mean(hrv.map(p => p.value)), hsd = (() => { const v = hrv.map(p => p.value).filter(x => x != null); if (v.length < 3) return null; const m = hm; return Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length) })()
-    const rows = eachDay(from, to).map((date, i) => {
-      const parts = [sleep[i].value, bb[i].value, hrvPts(hrv[i].value, hm, hsd)].filter(x => x != null)
-      const est = parts.length >= 2 ? Math.round(mean(parts)) : null
-      const rd = ready[i].value
-      return { date, score: hasReadiness ? rd : est, sleep: sleep[i].value, hrv: hrv[i].value, bb: bb[i].value, status: days[date]?.hrv?.status || null }
-    })
+    // Same score as the Today hero: Garmin readiness when a day has it, else the recovery estimate
+    const hasReadiness = rec.some(p => p.kind === 'garmin')
+    const rows = rec.map((p, i) => ({ date: p.date, score: p.value, sleep: sleep[i].value, hrv: hrv[i].value, bb: bb[i].value, status: days[p.date]?.hrv?.status || null }))
     const main = rows.map(r => ({ date: r.date, value: r.score }))
     const good = rows.filter(r => r.score != null && r.score >= 75).length, scored = rows.filter(r => r.score != null).length
     const low = rows.filter(r => r.score != null && r.score < 50).length
     return { rows, main, hasReadiness, good, scored, low, sum: summarize(main), ss: summarize(sleep), hs: summarize(hrv), bs: summarize(bb), all: Object.values(days).some(x => x.readiness?.score != null || x.sleep?.score != null || x.bodyBattery?.high != null) }
-  }, [days, from, to])
+  }, [days, from, to, sleepNeedHours])
   const lastStatus = [...d.rows].reverse().find(r => r.status)?.status
-  const hb = hrvStatusBand(lastStatus), band = METRICS.readiness.band(d.sum.avg)
+  const hb = hrvStatusBand(lastStatus), band = METRICS.readiness.band(d.sum.avg == null ? null : Math.round(d.sum.avg))
   const csv = () => ({ filename: `recovery-${from}_${to}.csv`, rows: d.rows, columns: [{ key: 'date', label: 'Date' }, { key: 'score', label: d.hasReadiness ? 'Readiness' : 'Recovery estimate' }, { key: 'sleep', label: 'Sleep score' }, { key: 'hrv', label: 'HRV (ms)' }, { key: 'bb', label: 'Body Battery high' }] })
   const label = d.hasReadiness ? 'Training readiness' : 'Recovery estimate'
   const small = (title, key, sub, data, hue, fmt, domain) => <div key={title}>
@@ -48,7 +40,7 @@ export default function Recovery() {
       { label: 'Low-recovery days', value: d.scored ? String(d.low) : '—', sub: 'Score under 50', tone: d.low > d.scored * .3 ? 'warning' : undefined },
       { label: 'Latest HRV status', value: hb?.label || '—', sub: hb ? 'From Garmin' : 'Not reported', tone: hb?.tone },
     ]}>
-    <Card title={label} subtitle={d.hasReadiness ? 'Garmin training readiness, 0–100' : 'Garmin gave no readiness score, so this is our estimate: the average of sleep score, Body Battery high and HRV compared with your own usual'}>
+    <Card title={label} subtitle={d.hasReadiness ? 'Garmin training readiness, 0–100' : 'Our estimate, 0–100, the same as on Today: sleep score and length against your sleep need, HRV against your own usual, and Body Battery high'}>
       <MiniTrend data={d.main} label={label} hue="readiness" kind="area" height={200} domain={[0, 100]} format={v => String(Math.round(v))} refLine={d.sum.avg == null ? undefined : { value: Math.round(d.sum.avg), label: `Average ${Math.round(d.sum.avg)}` }} />
     </Card>
     <Card title="What feeds it" subtitle="Same dates on every chart so you can read down a column">

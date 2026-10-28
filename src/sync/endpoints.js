@@ -4,9 +4,10 @@
 //   kind 'perDay' one request per day                        path(date)
 //   kind 'paged'  `limit`/`start` paging                     params({ start, limit })
 //   kind 'single' one request
-// `experimental` endpoints may not be exposed to Personal API keys; they degrade to 'unavailable'.
+// `experimental` endpoints (readiness, intensity) return 404 for Personal API keys (checked 2026-10-28)
+// and degrade to 'unavailable' after one request.
 import {
-  activitiesFrom, bodyBatteryFrom, collect, heartRateFrom, hrvFrom, intensityFrom, profileFrom, readinessFrom,
+  activitiesFrom, bodyBatteryFrom, collect, heartRateFrom, hrvFrom, intensityFrom, ownerNameFrom, profileFrom, readinessFrom,
   rowsOf, sleepDays, stepsFrom, stressFrom, userSummaryFrom, weightFrom,
 } from '../data/normalize.js'
 
@@ -24,7 +25,10 @@ export const ENDPOINTS = [
     id: 'activities', label: 'Activities', group: 'Training', kind: 'paged', pageSize: PAGE, maxItems: 5000,
     path: () => '/activitylist-service/activities/search/activities',
     params: ({ start = 0, limit = PAGE } = {}) => ({ start, limit }),
-    normalize: json => ({ activities: activitiesFrom(json) }),
+    normalize: json => {
+      const fullName = ownerNameFrom(json)
+      return { activities: activitiesFrom(json), ...(fullName ? { profile: { fullName } } : {}) }
+    },
   },
   {
     id: 'steps', label: 'Daily steps', group: 'Activity', kind: 'range', chunkDays: 27,
@@ -65,7 +69,7 @@ export const ENDPOINTS = [
     normalize: wrap((json, ctx) => days(json, ['dailyWeightSummaries', 'dateWeightList'], weightFrom, ctx)),
   },
   {
-    id: 'userSummary', label: 'Daily summary', group: 'Activity', kind: 'perDay', experimental: true,
+    id: 'userSummary', label: 'Daily summary', group: 'Activity', kind: 'perDay',
     path: () => '/usersummary-service/usersummary/daily',
     params: date => ({ calendarDate: date }),
     normalize: wrap((json, ctx) => collect([userSummaryFrom(json, ctx?.date)])),
@@ -85,7 +89,7 @@ export const ENDPOINTS = [
     normalize: wrap((json, ctx) => days(json, ['values', 'dailyIntensityMinutes'], intensityFrom, ctx)),
   },
   {
-    id: 'heartRate', label: 'Daily heart rate', group: 'Heart', kind: 'perDay', experimental: true,
+    id: 'heartRate', label: 'Daily heart rate', group: 'Heart', kind: 'perDay',
     path: () => '/wellness-service/wellness/dailyHeartRate',
     params: date => ({ date }),
     normalize: wrap((json, ctx) => collect([heartRateFrom(json, ctx?.date)])),

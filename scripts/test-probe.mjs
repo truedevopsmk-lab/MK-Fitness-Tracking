@@ -166,5 +166,7 @@ const by = r => Object.fromEntries(r.results.map(x => [x.id, x]))
 }
 
 assert.equal(P.PROBES.length, 38)
+assert.deepEqual(P.PROBES.find(p => p.id === 'app.sleep').capture([{ userProfilePK: 7 }]), { profileId: 7 })
+assert.deepEqual(P.PROBES.find(p => p.id === 'app.hrv').capture({ userProfilePk: 8 }), { profileId: 8 })
 assert.equal(new Set(P.PROBES.map(p => p.id)).size, 38)
 console.log('probe tests: all passed')

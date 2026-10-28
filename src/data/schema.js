@@ -30,18 +30,36 @@ export const SCHEMA_VERSION = 1
  * @property {number|null} avgRespiration   breaths/min
  * @property {number|null} avgSpo2          %
  * @property {number|null} bodyBatteryChange  BB gained overnight
+ * @property {number|null} awakeCount       times woken during the night
+ * @property {number|null} avgSleepStress   average stress while asleep (0–100)
+ * @property {number|null} lowRespiration   breaths/min
+ * @property {number|null} highRespiration  breaths/min
+ * @property {number|null} napSec           daytime nap time Garmin attributes to this day
+ * @property {number|null} unmeasurableSec  time the watch could not classify
+ * @property {string|null} feedback         Garmin's feedback code, e.g. 'POSITIVE_LONG_AND_DEEP'
+ * @property {Object<string, SleepSubScore>} [subScores]  keys: duration, stress, awakenings, restlessness, rem, light, deep
  * @property {Array<{start:number,end:number,stage:SleepStage}>} [stages]  hypnogram, epoch ms
+ *
+ * @typedef {Object} SleepSubScore
+ * @property {number|null} value        percentage of the night for rem/light/deep, otherwise usually null
+ * @property {string|null} qualifier    Garmin's qualifierKey, e.g. 'EXCELLENT', 'GOOD', 'FAIR', 'POOR'
+ * @property {number|null} optimalLow   start of Garmin's optimal range (units depend on the component)
+ * @property {number|null} optimalHigh
  *
  * @typedef {Object} DayRecord
  * @property {string} date
  * @property {{total:number|null, goal:number|null, distanceM:number|null}} [steps]
  * @property {{avg:number|null, max:number|null, restSec:number|null, lowSec:number|null, mediumSec:number|null, highSec:number|null}} [stress]
- * @property {{start:number|null, end:number|null, high:number|null, low:number|null, charged:number|null, drained:number|null, samples?:Array<[number, number]>}} [bodyBattery]
- *           start/end = first/last level of the day; samples = [epochMs, level] sorted ascending
+ * @property {{start:number|null, end:number|null, high:number|null, low:number|null, charged:number|null, drained:number|null, latest?:number|null, atWake?:number|null, duringSleep?:number|null, samples?:Array<[number, number]>}} [bodyBattery]
+ *           start/end = first/last level of the day; samples = [epochMs, level] sorted ascending;
+ *           latest = most recent reading, atWake = level on waking, duringSleep = gained overnight
  * @property {SleepRecord} [sleep]
  * @property {{lastNight:number|null, weeklyAvg:number|null, lastNightHigh:number|null, status:string|null, baselineLow:number|null, baselineHigh:number|null}} [hrv]
  *           status is Garmin's: 'BALANCED' | 'UNBALANCED' | 'LOW' | 'POOR' | 'NONE'; baseline = balanced range
- * @property {{resting:number|null, min:number|null, max:number|null}} [heartRate]
+ * @property {{resting:number|null, min:number|null, max:number|null, resting7d?:number|null, samples?:Array<[number, number]>}} [heartRate]
+ *           resting7d = Garmin's 7-day average resting HR; samples = [bucketEpochMs, bpm] in 10-minute buckets (only with ≥ 2 buckets)
+ * @property {{waking:number|null, low:number|null, high:number|null, latest:number|null}} [respiration]  breaths/min
+ * @property {{activeSec:number|null, highlyActiveSec:number|null, sedentarySec:number|null, activeKcal:number|null, totalKcal:number|null, floors:number|null}} [movement]
  * @property {{moderate:number|null, vigorous:number|null, goal:number|null}} [intensity]
  *           minutes; Garmin counts total = moderate + 2 × vigorous, goal is WEEKLY (default 150)
  * @property {{score:number|null, level:string|null, feedback:string|null}} [readiness]

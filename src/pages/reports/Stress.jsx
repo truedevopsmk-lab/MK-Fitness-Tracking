@@ -26,7 +26,7 @@ export default function Stress() {
     const all = Object.values(days).some(x => x.stress?.avg != null)
     return { avg, sum: summarize(avg, prev), rows, hasBreakdown, totals, wsum, highest, wk: weekdayAverages(avg), all }
   }, [days, from, to, prevFrom, prevTo])
-  const band = M.band(d.sum.avg)
+  const band = M.band(d.sum.avg == null ? null : Math.round(d.sum.avg))
   const wkVals = d.wk.filter(w => w.value != null)
   const calm = wkVals.length ? wkVals.reduce((a, b) => a.value < b.value ? a : b) : null
   const busy = wkVals.length ? wkVals.reduce((a, b) => a.value > b.value ? a : b) : null

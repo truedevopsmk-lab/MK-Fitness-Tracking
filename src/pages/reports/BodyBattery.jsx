@@ -77,7 +77,7 @@ export default function BodyBattery() {
   const hasCD = d.ch.some(p => p.value != null) || d.dr.some(p => p.value != null)
   const net = d.sc.avg != null && d.sd.avg != null ? d.sc.avg - d.sd.avg : null
   const csv = () => ({ filename: `body-battery-${from}_${to}.csv`, rows: d.rows, columns: [{ key: 'date', label: 'Date' }, { key: 'high', label: 'High' }, { key: 'low', label: 'Low' }, { key: 'charged', label: 'Charged' }, { key: 'drained', label: 'Drained' }] })
-  const band = METRICS.bodyBatteryHigh.band(d.sh.avg)
+  const band = METRICS.bodyBatteryHigh.band(d.sh.avg == null ? null : Math.round(d.sh.avg))
   return <ReportLayout title="Body Battery" icon="battery" hue="battery" subtitle="Energy gained and spent" range={range} onRange={setRange} hasData={d.all} csv={csv}
     missing={{ missing: d.sh.missing, total: d.sh.total }}
     summary={[

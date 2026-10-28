@@ -16,6 +16,12 @@ const sleepWrapped = { dailySleepDTO: { calendarDate: '2026-10-24', sleepTimeSec
   restingHeartRate: 49, avgOvernightHrv: 61.2, bodyBatteryChange: 63,
   sleepLevels: [{ startGMT: '2026-10-24T20:00:00.0', endGMT: '2026-10-24T21:00:00.0', activityLevel: 1 }, { startGMT: '2026-10-24T21:00:00.0', endGMT: '2026-10-24T22:00:00.0', activityLevel: 0 }, { startGMT: '2026-10-24T22:00:00.0', endGMT: '2026-10-24T22:00:00.0', activityLevel: 2 }, { startGMT: 'junk', activityLevel: 9 }] }
 const sleepFlat = { calendarDate: '2026-10-23', sleepTimeSeconds: '25000', overallSleepScore: '74', deepSleepSeconds: null }
+const comp = (q, extra = {}) => ({ qualifierKey: q, optimalStart: 1, optimalEnd: 2, ...extra })
+const sleepReal = { calendarDate: '2026-10-25', sleepTimeSeconds: 26400, napTimeSeconds: 1200, sleepStartTimestampGMT: 1792770000000, sleepEndTimestampGMT: 1792797000000, unmeasurableSleepSeconds: 0,
+  deepSleepSeconds: 4800, lightSleepSeconds: 15000, remSleepSeconds: 6600, awakeSleepSeconds: 900, averageRespirationValue: 14.5, lowestRespirationValue: 11, highestRespirationValue: 19, awakeCount: 2, avgSleepStress: 14.5,
+  sleepScoreFeedback: 'POSITIVE_LONG_AND_DEEP', sleepScoreInsight: 'NONE',
+  sleepScores: { totalDuration: comp('GOOD', { optimalStart: 27000, optimalEnd: 32400 }), stress: comp('FAIR'), awakeCount: comp('GOOD'), overall: { value: 77, qualifierKey: 'GOOD' },
+    remPercentage: comp('EXCELLENT', { value: 25, optimalStart: 21, optimalEnd: 31, idealStartInSeconds: 5000, idealEndInSeconds: 8000 }), restlessness: comp('FAIR'), lightPercentage: comp('GOOD', { value: 57 }), deepPercentage: comp('FAIR', { value: 18 }) } }
 const act = { activityId: 12345678901, activityName: 'Morning Run', startTimeLocal: '2026-10-24 06:12:00', startTimeGMT: '2026-10-24 00:42:00', activityType: { typeKey: 'running' }, duration: 1800.4, distance: 5200, calories: 410, averageHR: 150, maxHR: 171, activityTrainingLoad: 95.4, hrTimeInZone_1: 60, hrTimeInZone_2: 300 }
 const act2 = { activityId: 12345678902, startTimeLocal: '2026-10-24T18:00:00.0', startTimeGMT: '2026-10-24T12:30:00.0', activityType: { typeKey: 'strength_training' }, duration: 2400, distance: 0, calories: 200 }
 
@@ -38,6 +44,20 @@ await t('sleep wrapped', () => {
   assert.equal(s.sleep.startTs, 1792770000000)
   assert.deepEqual(s.sleep.stages.map(x => x.stage), ['light', 'deep']) // zero-length and junk levels dropped
   assert.equal(s.sleep.stages[0].start, Date.UTC(2026, 9, 24, 20))
+})
+await t('sleep real flat row', () => {
+  const s = n.sleepFrom(sleepReal).sleep
+  assert.equal(s.score, 77); assert.equal(s.qualifier, 'GOOD'); assert.equal(s.startTs, 1792770000000); assert.equal(s.endTs, 1792797000000)
+  assert.equal(s.awakeCount, 2); assert.equal(s.avgSleepStress, 14.5); assert.equal(s.lowRespiration, 11); assert.equal(s.highRespiration, 19); assert.equal(s.napSec, 1200); assert.equal(s.unmeasurableSec, 0)
+  assert.equal(s.feedback, 'POSITIVE_LONG_AND_DEEP'); assert.equal(s.restingHr, null); assert.equal(s.avgHrv, null)
+  assert.deepEqual(s.subScores.rem, { value: 25, qualifier: 'EXCELLENT', optimalLow: 21, optimalHigh: 31 })
+  assert.equal(s.subScores.duration.value, null); assert.equal(s.subScores.duration.qualifier, 'GOOD'); assert.equal(s.subScores.duration.optimalHigh, 32400)
+  assert.deepEqual(Object.keys(s.subScores).sort(), ['awakenings', 'deep', 'duration', 'light', 'rem', 'restlessness', 'stress'])
+  assert.ok(!('overall' in s.subScores))
+  const { sleepScores, ...noScores } = sleepReal
+  assert.ok(!('subScores' in n.sleepFrom(noScores).sleep))
+  assert.ok(!('subScores' in n.sleepFrom({ ...sleepReal, sleepScores: { overall: { value: 70 } } }).sleep))
+  assert.equal(n.sleepFrom({ ...sleepReal, avgSleepStress: -1 }).sleep.avgSleepStress, null)
 })
 await t('sleep score variants', () => {
   assert.equal(n.sleepFrom({ calendarDate: '2026-10-01', sleepTimeSeconds: 1, sleepScores: { overallScore: 70 } }).sleep.score, 70)
@@ -81,10 +101,16 @@ await t('steps/stress/hrv/weight', () => {
   assert.equal(n.weightFrom({ summaryDate: '2026-10-24', latestWeight: { weight: 72.4, calendarDate: '2026-10-24' } }).weight.kg, 72.4)
   assert.equal(n.weightFrom({ calendarDate: '2026-10-24', weight: null }), null)
 })
-await t('experimental normalisers', () => {
+await t('daily summary / readiness / intensity / heart-rate normalisers', () => {
   const u = ENDPOINT_BY_ID.userSummary.normalize({ calendarDate: '2026-10-24', restingHeartRate: 50, minHeartRate: 44, maxHeartRate: 160, moderateIntensityMinutes: 20, vigorousIntensityMinutes: 5, bodyBatteryChargedValue: 60, bodyBatteryDrainedValue: 55, totalSteps: 7000, averageStressLevel: 28 }, { date: '2026-10-24' }).days['2026-10-24']
   assert.equal(u.heartRate.resting, 50); assert.equal(u.intensity.vigorous, 5); assert.equal(u.bodyBattery.charged, 60); assert.equal(u.stress.avg, 28); assert.equal(u.steps.total, 7000)
   assert.deepEqual(ENDPOINT_BY_ID.userSummary.normalize(null, { date: '2026-10-24' }).days, {})
+  const u2 = ENDPOINT_BY_ID.userSummary.normalize({ calendarDate: '2026-10-24', restingHeartRate: 50, lastSevenDaysAvgRestingHeartRate: 52, bodyBatteryMostRecentValue: 41, bodyBatteryAtWakeTime: 88, bodyBatteryDuringSleep: 63,
+    avgWakingRespirationValue: 15, lowestRespirationValue: 10, highestRespirationValue: 22, latestRespirationValue: 14, activeSeconds: 5000, highlyActiveSeconds: 900, sedentarySeconds: 30000, activeKilocalories: 500, totalKilocalories: 2300, floorsAscended: 12.5 }, { date: '2026-10-24' }).days['2026-10-24']
+  assert.equal(u2.heartRate.resting7d, 52); assert.equal(u2.bodyBattery.latest, 41); assert.equal(u2.bodyBattery.atWake, 88); assert.equal(u2.bodyBattery.duringSleep, 63)
+  assert.deepEqual(u2.respiration, { waking: 15, low: 10, high: 22, latest: 14 })
+  assert.deepEqual(u2.movement, { activeSec: 5000, highlyActiveSec: 900, sedentarySec: 30000, activeKcal: 500, totalKcal: 2300, floors: 12.5 })
+  assert.ok(!('respiration' in u) && !('movement' in u))
   const r = ENDPOINT_BY_ID.readiness.normalize([{ calendarDate: '2026-10-24', score: 40, level: 'LOW' }, { calendarDate: '2026-10-24', score: 72, level: 'HIGH', feedbackShort: 'PRIME' }], { date: '2026-10-24' }).days['2026-10-24']
   assert.equal(r.readiness.score, 72); assert.equal(r.readiness.feedback, 'PRIME')
   const im = ENDPOINT_BY_ID.intensity.normalize({ values: [{ calendarDate: '2026-10-24', moderateValue: 10, vigorousValue: 2, weeklyGoal: 150 }] }, {}).days['2026-10-24']
@@ -93,11 +119,39 @@ await t('experimental normalisers', () => {
   assert.equal(hr.heartRate.resting, 51)
   assert.deepEqual(ENDPOINT_BY_ID.heartRate.normalize({}, { date: '2026-10-24' }).days, {})
 })
+await t('heart-rate intraday samples', () => {
+  const t0 = Date.UTC(2026, 9, 24, 3, 0)
+  const min = m => t0 + m * 60000
+  const vals = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24].map((m, i) => [min(m), 60 + i])
+  const hr = n.heartRateFrom({ calendarDate: '2026-10-24', restingHeartRate: 50, lastSevenDaysAvgRestingHeartRate: 53, heartRateValueDescriptors: [{ index: 0, key: 'timestamp' }, { index: 1, key: 'heartrate' }], heartRateValues: [...vals, [min(26), null], [min(27), 0], ['x', 70]] }).heartRate
+  assert.equal(hr.resting7d, 53)
+  assert.deepEqual(hr.samples, [[min(0), 62], [min(10), 67], [min(20), 71]])
+})
+await t('heart-rate samples descriptors, nulls, single bucket', () => {
+  const t0 = Date.UTC(2026, 9, 24, 3, 0)
+  const swapped = n.hrSamples({ heartRateValueDescriptors: [{ index: 0, key: 'heartrate' }, { index: 1, key: 'timestamp' }], heartRateValues: [[60, t0], [70, t0 + 700000], [null, t0 + 800000]] })
+  assert.deepEqual(swapped, [[t0, 60], [t0 + 600000, 70]])
+  assert.deepEqual(n.hrSamples({ heartRateValues: [[t0, 60], [t0 + 120000, 64]] }), [[t0, 62]], 'default order')
+  assert.deepEqual(n.hrSamples({}), []); assert.deepEqual(n.hrSamples(null), [])
+  const one = n.heartRateFrom({ calendarDate: '2026-10-24', restingHeartRate: 50, heartRateValues: [[t0, 60], [t0 + 120000, 64]] }).heartRate
+  assert.ok(!('samples' in one))
+  const only = n.heartRateFrom({ calendarDate: '2026-10-24', heartRateValues: [[t0, 60], [t0 + 700000, 70]] })
+  assert.equal(only.heartRate.samples.length, 2); assert.equal(only.heartRate.resting, null)
+  assert.equal(n.heartRateFrom({ calendarDate: '2026-10-24', heartRateValues: [[t0, 60]] }), null)
+})
+await t('activities endpoint returns owner name', () => {
+  const ep = ENDPOINT_BY_ID.activities
+  assert.deepEqual(ep.normalize([{ ...act, ownerFullName: '  Test Person ' }]).profile, { fullName: 'Test Person' })
+  assert.equal(ep.normalize([act2, { ...act, ownerFullName: 'Test Person' }]).profile.fullName, 'Test Person')
+  assert.ok(!('profile' in ep.normalize([act, { ...act2, ownerFullName: '  ' }])))
+  assert.ok(!('profile' in ep.normalize(null)))
+  assert.equal(n.ownerNameFrom([act]), null)
+})
 await t('registry endpoints all normalise junk without throwing', () => {
   for (const ep of ENDPOINTS) for (const junk of [null, undefined, [], {}, 'x', 0, [null, 5, 'a'], { a: { b: 1 } }]) {
     const r = ep.normalize(junk, { date: '2026-10-24' }); assert.ok(r && typeof r === 'object', ep.id)
   }
-  assert.deepEqual(ENDPOINTS.filter(e => e.experimental).map(e => e.id).sort(), ['heartRate', 'intensity', 'readiness', 'userSummary'])
+  assert.deepEqual(ENDPOINTS.filter(e => e.experimental).map(e => e.id).sort(), ['intensity', 'readiness'])
   const bb = ENDPOINT_BY_ID.bodyBattery
   assert.deepEqual(bb.params('2026-10-01', '2026-10-27'), { startDate: '2026-10-01', endDate: '2026-10-27' })
 })

@@ -23,7 +23,7 @@ export function generateDemo(seed = 20260101) {
   const dipStart = addDays(end, -3), dipEnd = end
   const days = [], activities = []
   let prevSleepH = 7, actSeq = 0
-  const hrvWindow = []
+  const hrvWindow = [], rhrWindow = []
 
   all.forEach((date, i) => {
     const dow = parseDay(date).getDay(), weekend = dow === 0 || dow === 6
@@ -81,8 +81,26 @@ export function generateDemo(seed = 20260101) {
     const steps = Math.round(clamp((weekend ? 9200 : 8800) + noise(3400) + (todays.some(a => a.type === 'running' || a.type === 'walking') ? 2600 : 0) + (dip ? -1200 : 0), 4000, 16000))
     // Garmin only counts sustained 10+ min bouts, so most of the day's steps earn nothing
     const moderate = Math.round(clamp((steps - 7000) / 260 + noise(6) + (todays.some(a => a.type === 'walking' || a.type === 'strength_training') ? 18 : 0), 0, 45)), vigorous = Math.round(todays.some(a => a.type === 'running' || a.type === 'cycling') ? 12 + rand() * 22 : 0)
-    // readiness
-    const readiness = Math.round(clamp(22 + score * .32 + (hrv - 40) * .85 - (load > 70 ? 8 : 0) + noise(5), 15, 98))
+    // extra sleep detail Garmin sends for Personal keys
+    const awakeCount = Math.round(clamp(2 + (sleepH < 6.3 ? 1.5 : 0) + (score < 70 ? 1 : 0) + noise(1.6), 1, 5))
+    const avgSleepStress = Math.round(clamp(17 + (stressAvg - 33) * .35 + noise(4), 10, 30))
+    const avgResp = r1(14.2 + noise(1))
+    const qualBand = (v, lo, hi) => v >= lo && v <= hi ? (v - lo < (hi - lo) * .8 ? 'EXCELLENT' : 'GOOD') : Math.abs(v - (v < lo ? lo : hi)) <= 4 ? 'FAIR' : 'POOR'
+    const pct = sec => Math.round(sec / asleep * 100)
+    const stagePct = (sec, lo, hi) => { const value = pct(sec); return { value, qualifier: qualBand(value, lo, hi), optimalLow: lo, optimalHigh: hi } }
+    const needH = 7.5
+    const subScores = {
+      duration: { value: null, qualifier: sleepH >= needH + .5 ? 'EXCELLENT' : sleepH >= needH ? 'GOOD' : sleepH >= needH - 1 ? 'FAIR' : 'POOR', optimalLow: 27000, optimalHigh: 32400 },
+      stress: { value: null, qualifier: avgSleepStress <= 12 ? 'EXCELLENT' : avgSleepStress <= 15 ? 'GOOD' : avgSleepStress <= 22 ? 'FAIR' : 'POOR', optimalLow: 0, optimalHigh: 15 },
+      awakenings: { value: null, qualifier: awakeCount <= 1 ? 'GOOD' : awakeCount <= 3 ? 'FAIR' : 'POOR', optimalLow: 0, optimalHigh: 1 },
+      restlessness: { value: null, qualifier: score >= 75 ? 'GOOD' : score >= 55 ? 'FAIR' : 'POOR', optimalLow: 0, optimalHigh: 30 },
+      rem: stagePct(remSec, 21, 31), light: stagePct(lightSec, 30, 64), deep: stagePct(deepSec, 16, 33),
+    }
+    // intraday-ish daily movement
+    const activeSec = Math.round(clamp(steps * .22 + noise(900) + todays.reduce((a, x) => a + x.durationSec, 0) * .5, 1500, 18000))
+    const highlyActiveSec = Math.round(clamp((moderate + vigorous * 2) * 40 + noise(300), 0, 5000))
+    const activeKcal = Math.round(clamp(steps * .045 + todays.reduce((a, x) => a + x.calories, 0) * .8 + noise(40), 120, 1400))
+    const bmrKcal = 1720 + Math.round(noise(20))
 
     const rec = {
       date,
@@ -91,12 +109,16 @@ export function generateDemo(seed = 20260101) {
       bodyBattery: { start: bbStart, end: Math.round(clamp(bbLow + 4, 6, 70)), high: Math.min(100, bbStart), low: bbLow, charged, drained },
       sleep: {
         score, qualifier: score >= 80 ? 'GOOD' : score >= 60 ? 'FAIR' : 'POOR', durationSec: asleep, deepSec, lightSec, remSec, awakeSec,
-        startTs: null, endTs: null, needSec: 7.5 * 3600, restingHr: rhr - 2, avgHr: rhr + 3, avgHrv: Math.round(hrv), avgRespiration: r1(14.2 + noise(1)), avgSpo2: Math.round(95 + noise(2)), bodyBatteryChange: charged,
+        startTs: null, endTs: null, needSec: null, avgRespiration: avgResp, bodyBatteryChange: charged,
+        awakeCount, avgSleepStress, lowRespiration: r1(avgResp - 2.5), highRespiration: r1(avgResp + 3.5),
+        napSec: weekend && rand() < .15 ? Math.round((20 + rand() * 20) * 60) : 0, unmeasurableSec: 0,
+        feedback: sleepH >= 7.5 && score >= 80 ? 'POSITIVE_LONG_AND_DEEP' : sleepH < 6.3 ? 'NEGATIVE_SHORT' : 'POSITIVE_RECOVERING', subScores,
       },
       hrv: { lastNight: Math.round(hrv), weeklyAvg: (hrvWindow.push(hrv), hrvWindow.length > 7 && hrvWindow.shift(), Math.round(hrvWindow.reduce((a, b) => a + b, 0) / hrvWindow.length)), lastNightHigh: Math.round(hrv + 16 + noise(4)), status: hrvStatus, baselineLow: baseLow, baselineHigh: baseHigh },
-      heartRate: { resting: rhr, min: rhr - 6, max: Math.round(clamp(rhr + 70 + load * .6 + noise(10), 110, 185)) },
+      heartRate: { resting: rhr, min: rhr - 6, max: Math.round(clamp(rhr + 70 + load * .6 + noise(10), 110, 185)), resting7d: (rhrWindow.push(rhr), rhrWindow.length > 7 && rhrWindow.shift(), Math.round(rhrWindow.reduce((a, b) => a + b, 0) / rhrWindow.length)) },
+      respiration: { waking: r1(15.5 + noise(1)), low: r1(11 + noise(.8)), high: r1(24 + noise(1.5)), latest: r1(15 + noise(1.5)) },
+      movement: { activeSec, highlyActiveSec, sedentarySec: Math.round(clamp(16 * 3600 - activeSec - highlyActiveSec, 14000, 50000)), activeKcal, totalKcal: bmrKcal + activeKcal, floors: Math.round(clamp(8 + noise(5) + steps / 1500, 0, 40)) },
       intensity: { moderate, vigorous, goal: 150 },
-      readiness: { score: readiness, level: readiness >= 75 ? 'HIGH' : readiness >= 50 ? 'MODERATE' : 'LOW', feedback: readiness >= 75 ? 'GOOD_SLEEP_HISTORY' : readiness >= 50 ? 'MODERATE' : 'RECOVERY_NEEDED' },
       weight: rand() < .35 ? { kg: r1(74.5 - i * .004 + noise(.5)) } : undefined,
     }
     // wake time at ~06:30-07:30 local; used for hypnogram + sleep times
@@ -105,6 +127,9 @@ export function generateDemo(seed = 20260101) {
     const fromEnd = all.length - 1 - i
     if (fromEnd < 30) rec.sleep.stages = hypnogram(rand, rec.sleep.startTs, { deepSec, lightSec, remSec, awakeSec })
     if (fromEnd < 14) rec.bodyBattery.samples = bbSamples(parseDay(date).getTime(), bbLow, bbStart, rec.sleep.endTs, rec.sleep.startTs - 86400000 * 0, charged, rand)
+    rec.bodyBattery.atWake = bbStart; rec.bodyBattery.duringSleep = charged
+    rec.bodyBattery.latest = rec.bodyBattery.samples ? rec.bodyBattery.samples.at(-1)?.[1] ?? rec.bodyBattery.end : rec.bodyBattery.end
+    if (fromEnd < 14) rec.heartRate.samples = hrSamples(parseDay(date).getTime(), rhr, rec.sleep.startTs, rec.sleep.endTs, todays, rand, noise)
     if (todays.length) rec.training = { count: todays.length, durationSec: todays.reduce((a, x) => a + x.durationSec, 0), distanceM: todays.reduce((a, x) => a + x.distanceM, 0), calories: todays.reduce((a, x) => a + x.calories, 0), load }
     else rec.training = { count: 0, durationSec: 0, distanceM: 0, calories: 0, load: 0 }
     if (!rec.weight) delete rec.weight
@@ -113,12 +138,15 @@ export function generateDemo(seed = 20260101) {
       const f = clamp((new Date().getHours() * 60 + new Date().getMinutes()) / 1440, .25, 1)
       rec.steps.total = Math.round(rec.steps.total * f); rec.stress.highSec = Math.round(hi * f); rec.stress.mediumSec = Math.round(med * f); rec.stress.lowSec = Math.round(lowS * f); rec.stress.restSec = Math.round(restS * f)
       rec.intensity.moderate = Math.round(moderate * f); rec.intensity.vigorous = 0
+      for (const k of ['activeSec', 'highlyActiveSec', 'activeKcal', 'floors']) rec.movement[k] = Math.round(rec.movement[k] * f)
+      rec.movement.sedentarySec = Math.round(rec.movement.sedentarySec * f); rec.movement.totalKcal = Math.round(bmrKcal * f + rec.movement.activeKcal)
       rec.bodyBattery.end = Math.round(bbStart - (bbStart - bbLow) * f); rec.bodyBattery.low = rec.bodyBattery.end
+      if (!rec.bodyBattery.samples) rec.bodyBattery.latest = rec.bodyBattery.end
     }
     prevSleepH = sleepH
     days.push(rec)
   })
-  return { days, activities, profile: { displayName: 'e0399703-3ad1-4a14-97d1-d21fc75573cf', fullName: null, timeZone: 'Asia/Kolkata', stepGoal: 10000, sleepNeedSec: 7.5 * 3600 } }
+  return { days, activities, profile: { displayName: 'e0399703-3ad1-4a14-97d1-d21fc75573cf', fullName: null, timeZone: 'Asia/Kolkata', stepGoal: 10000 } }
 }
 
 // Plausible hypnogram: light → deep early, REM later, brief awakenings; segment lengths are rescaled to match the night's totals.
@@ -140,6 +168,17 @@ function hypnogram(rand, startTs, t) {
     const dur = Math.max(60000, Math.round((m / (sums[stage] || 1)) * want[stage] * 1000))
     const seg = { start: ts, end: ts + dur, stage }; ts += dur; return seg
   })
+}
+
+// Heart rate in 10-minute buckets: near resting asleep, elevated awake, near the activity's average during workouts. Future buckets dropped.
+function hrSamples(dayStart, rhr, sleepStart, sleepEnd, acts, rand, noise) {
+  const out = []
+  for (let t = dayStart; t < dayStart + 86400000; t += 600000) {
+    const act = acts.find(a => a.startTs != null && a.durationSec && t >= a.startTs && t < a.startTs + a.durationSec * 1000)
+    const bpm = act?.avgHr ? act.avgHr + (rand() - .5) * 16 : t >= sleepStart && t < sleepEnd ? rhr + rand() * 4 : rhr + 12 + rand() * 16 + noise(3)
+    out.push([t, Math.round(bpm)])
+  }
+  return out.filter(s => s[0] <= Date.now())
 }
 
 // Body battery every 15 min across the calendar day: charging overnight, draining by day with small stress dips.

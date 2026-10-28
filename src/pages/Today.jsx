@@ -7,6 +7,7 @@ import { METRICS, hrvStatusBand, isMeaningfulDelta } from '../lib/metrics'
 import { computeInsights } from '../lib/insights'
 import { latestValue, lastNDays } from '../data/select'
 import { useDisplayName, withName } from '../lib/name'
+import { usePrefs } from '../lib/prefs'
 import { bodyBatteryNow, deltaVs7, greetingFor, headlineFor, intensityWeek, latestActivity, recoveryFor, weekGrid, whenLabel } from '../lib/homeLogic'
 import { Badge, Button, Card, Empty, Icon, InstallHint, Meter, PageHeader, Ring, SectionTitle, StatTile, toast } from '../components'
 
@@ -73,10 +74,10 @@ export default function Today() {
   const activities = useStore(s => s.activities)
   const profile = useStore(s => s.profile)
   const source = useStore(s => s.source)
-  const asOf = today()
+  const asOf = today(), { sleepNeedHours } = usePrefs()
   useSyncToast()
   const has = Object.keys(days).length > 0 || activities.length > 0
-  const rec = useMemo(() => recoveryFor(days, asOf), [days, asOf])
+  const rec = useMemo(() => recoveryFor(days, asOf, { sleepNeedHours }), [days, asOf, sleepNeedHours])
   const insights = useMemo(() => { try { return computeInsights(days, activities, { asOf }).slice(0, 2) } catch { return [] } }, [days, activities, asOf])
   const wk = useMemo(() => intensityWeek(days, asOf), [days, asOf])
   const act = useMemo(() => latestActivity(activities), [activities])

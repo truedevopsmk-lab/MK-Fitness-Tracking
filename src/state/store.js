@@ -10,7 +10,7 @@
 // to IndexedDB before the returned promise resolves.
 import { useSyncExternalStore } from 'react'
 import * as db from '../data/db.js'
-import { mergeActivities, mergeDays } from '../data/merge.js'
+import { mergeActivities, mergeDays, mergeSection } from '../data/merge.js'
 
 export const IDLE_SYNC = { running: false, mode: null, phase: '', done: 0, total: 0, current: null, startedAt: null, rateLimitedUntil: null, message: '' }
 const SOURCE_KEY = 'mk_fitness_source'
@@ -94,7 +94,7 @@ export const actions = {
   },
 
   async setProfile(profile) {
-    const merged = { ...(state.profile || {}), ...profile }
+    const merged = mergeSection(state.profile, profile)
     set({ profile: merged })
     await db.setMeta({ profile: merged })
   },

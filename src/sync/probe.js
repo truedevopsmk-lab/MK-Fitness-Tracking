@@ -10,9 +10,9 @@ const names = json => (Array.isArray(json?.metricDescriptors) ? json.metricDescr
 
 export const PROBES = [
   app('steps', 'Daily steps', '/usersummary-service/stats/steps/daily/{weekAgo}/{date}', { session: true }),
-  app('sleep', 'Sleep summaries', '/sleep-service/sleep/dailySleepSummariesByDate?startDate={weekAgo}&endDate={date}'),
+  app('sleep', 'Sleep summaries', '/sleep-service/sleep/dailySleepSummariesByDate?startDate={weekAgo}&endDate={date}', { capture: json => ({ profileId: (Array.isArray(json) ? json[0] : json)?.userProfilePK }) }),
   app('sleepDay', 'Sleep (one night)', '/sleep-service/sleep/dailySleep?date={date}'),
-  app('hrv', 'HRV', '/hrv-service/hrv/daily/{weekAgo}/{date}'),
+  app('hrv', 'HRV', '/hrv-service/hrv/daily/{weekAgo}/{date}', { capture: json => ({ profileId: json?.userProfilePk }) }),
   app('stress', 'Stress', '/usersummary-service/stats/stress/daily/{weekAgo}/{date}'),
   app('bodyBattery', 'Body Battery', '/wellness-service/wellness/bodyBattery/reports/daily?startDate={weekAgo}&endDate={date}'),
   app('weight', 'Weight', '/weight-service/weight/range/{monthAgo}/{date}'),

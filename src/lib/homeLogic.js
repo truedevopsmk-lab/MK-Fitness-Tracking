@@ -1,5 +1,5 @@
 // Pure helpers for the Today and Morning pages (recovery estimate, week strip, deltas).
-import { addDays, weekStart } from './dates.js'
+import { addDays, eachDay, weekStart } from './dates.js'
 import { METRICS, hrvStatusBand, isMeaningfulDelta, valueOf } from './metrics.js'
 import { mean } from './stats.js'
 import { latestValue } from '../data/select.js'
@@ -27,17 +27,19 @@ export function hrvRatio(days, hrv) {
 
 /**
  * Recovery for the hero. Garmin's training readiness when present, else an estimate from
- * sleep score, HRV vs baseline and Body Battery high. `parts` are the "why" chips.
+ * sleep score (and length vs need), HRV vs baseline and Body Battery high. `parts` are the "why" chips.
+ * `sleepNeedHours` is used when the night has no Garmin sleep need (always, on Personal keys).
  * @returns {{ score: number|null, kind: 'garmin'|'estimate'|null, date: string|null, parts: object[] }}
  */
-export function recoveryFor(days, asOf) {
-  const opt = { asOf, lookbackDays: 2 }
+export function recoveryFor(days, asOf, { sleepNeedHours = 8, lookbackDays = 2 } = {}) {
+  const opt = { asOf, lookbackDays }
   const sleep = latestValue(days, 'sleepScore', opt), hrv = latestValue(days, 'hrv', opt), bb = latestValue(days, 'bodyBatteryHigh', opt)
-  const readiness = latestValue(days, 'readiness', { asOf, lookbackDays: 1 })
+  const readiness = latestValue(days, 'readiness', { asOf, lookbackDays: Math.min(1, lookbackDays) })
+  const needOf = s => s?.needSec > 0 ? s.needSec : sleepNeedHours * 3600
   const comps = [], parts = []
   if (sleep) {
     // score blended with duration vs need, so a short night can't hide behind a decent score
-    const dur = sleep.record.sleep?.durationSec, need = sleep.record.sleep?.needSec || 8 * 3600
+    const dur = sleep.record.sleep?.durationSec, need = needOf(sleep.record.sleep)
     const durPts = dur ? clamp(100 * dur / need, 0, 100) : null
     comps.push([.4, durPts == null ? sleep.value : .6 * sleep.value + .4 * durPts])
     const b = METRICS.sleepScore.band(sleep.value)
@@ -63,10 +65,14 @@ export function recoveryFor(days, asOf) {
   const w = comps.reduce((a, [x]) => a + x, 0)
   let score = Math.round(comps.reduce((a, [x, s]) => a + x * s, 0) / w)
   // A short night caps readiness however full Body Battery looks (Garmin's readiness behaves the same way)
-  const dur = sleep?.record.sleep?.durationSec, need = sleep?.record.sleep?.needSec || 8 * 3600
+  const dur = sleep?.record.sleep?.durationSec, need = needOf(sleep?.record.sleep)
   if (dur) score = Math.min(score, need - dur > 2.5 * 3600 ? 55 : need - dur > 3600 ? 70 : 100)
   return { score, kind: 'estimate', date: (sleep || hrv || bb).date, parts }
 }
+
+/** Recovery per day for [from, to], each day on its own data (no carry-over). */
+export const recoverySeries = (days, from, to, opts = {}) =>
+  eachDay(from, to).map(date => { const r = recoveryFor(days, date, { ...opts, lookbackDays: 0 }); return { date, value: r.score, kind: r.kind } })
 
 /** Mon–Sun of the week containing asOf, with sleep / steps / activity count per day. */
 export function weekGrid(days, activities, asOf) {

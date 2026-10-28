@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useDisplayName, withName } from '../lib/name'
 import '../styles/home.css'
 import { useStore } from '../state/store'
+import { usePrefs } from '../lib/prefs'
 import { today } from '../lib/dates'
 import { fmtDuration } from '../lib/format'
 import { METRICS, SLEEP_STAGES, hrvStatusBand } from '../lib/metrics'
@@ -15,8 +16,8 @@ export default function Morning() {
   const days = useStore(s => s.days)
   const profile = useStore(s => s.profile)
   const name = useDisplayName()
-  const asOf = today()
-  const rec = useMemo(() => recoveryFor(days, asOf), [days, asOf])
+  const asOf = today(), { sleepNeedHours } = usePrefs()
+  const rec = useMemo(() => recoveryFor(days, asOf, { sleepNeedHours }), [days, asOf, sleepNeedHours])
   if (!Object.keys(days).length) return <div className="page morning"><Card><Empty icon="sync" title="No data yet" body="Sync with Garmin to see your morning check." action={<Button variant="primary" href="#/sync" icon="sync">Open Sync Center</Button>} /></Card></div>
 
   const sleep = latestValue(days, 'sleepScore', { asOf }), bb = latestValue(days, 'bodyBatteryHigh', { asOf })

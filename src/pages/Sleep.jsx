@@ -249,6 +249,7 @@ export default function Sleep() {
   const need = sleep ? needSecFor(sleep, prefs.sleepNeedHours) : null
   const short = sleep && need ? need - sleep.durationSec : null
   const hrvWeekly = rec?.hrv?.weeklyAvg
+  const restingHr = sleep?.restingHr ?? rec?.heartRate?.resting, avgHrv = sleep?.avgHrv ?? rec?.hrv?.lastNight
   const bbGain = sleep ? (num(sleep.bodyBatteryChange) ? sleep.bodyBatteryChange : num(rec?.bodyBattery?.charged) ? rec.bodyBattery.charged : null) : null
   const sub = `Night ending ${fmtWeekday(date)}${!asParam && latest.ageDays > 1 ? ` · latest night on record` : ''}`
   const raw = sleep ? { ...sleep, stages: sleep.stages ? `${sleep.stages.length} segments` : undefined } : null
@@ -303,8 +304,8 @@ export default function Sleep() {
       </Card>
 
       <div className="grid sl-grid">
-        {num(sleep.restingHr) && <StatTile metricKey="restingHr" value={sleep.restingHr} label="Resting HR" sub="During sleep" />}
-        {num(sleep.avgHrv) && <StatTile metricKey="hrv" value={sleep.avgHrv} label="Overnight HRV" delta={num(hrvWeekly) && Math.abs(sleep.avgHrv - hrvWeekly) >= 1 ? sleep.avgHrv - hrvWeekly : undefined} sub={num(hrvWeekly) ? `7-day avg ${hrvWeekly} ms` : 'No 7-day average yet'} band={false} />}
+        {num(restingHr) && <StatTile metricKey="restingHr" value={restingHr} label="Resting HR" sub={num(sleep.restingHr) ? 'During sleep' : 'Daily resting HR'} />}
+        {num(avgHrv) && <StatTile metricKey="hrv" value={avgHrv} label="Overnight HRV" delta={num(hrvWeekly) && Math.abs(avgHrv - hrvWeekly) >= 1 ? avgHrv - hrvWeekly : undefined} sub={num(hrvWeekly) ? `7-day avg ${hrvWeekly} ms` : 'No 7-day average yet'} band={false} />}
         {num(sleep.avgRespiration) && <StatTile metricKey="sleepScore" band={false} label="Respiration" value={fmtNumber(sleep.avgRespiration, 1)} unit="br/min" sub="Average overnight" />}
         {num(sleep.avgSpo2) && <StatTile metricKey="sleepScore" band={false} label="Blood oxygen" value={`${fmtNumber(sleep.avgSpo2)}%`} sub="Average SpO2" />}
         {num(bbGain) && <StatTile metricKey="bodyBatteryCharged" value={bbGain} label="Body Battery gained" sub="Overnight" band={false} />}
