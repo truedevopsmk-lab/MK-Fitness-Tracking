@@ -86,3 +86,28 @@
 .rb-foot { font-size: 12.5px; color: var(--text-3); line-height: 1.45; margin: 12px 0 0; }
 .rb-foot a { color: var(--accent-text); }
 .rb-ctx-val { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
+
+/* Health monitor */
+.rp-callout.is-neutral { border-left-color: var(--border-strong); }
+.hm-vitals { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.hm-vital { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-top: 1px solid var(--border); min-width: 0; }
+.hm-vital:first-child { border-top: 0; padding-top: 4px; }
+.hm-vital-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.hm-vital-name { display: flex; align-items: center; gap: 8px; font: 600 14px/1.3 var(--font-ui); }
+.hm-vital-name i { width: 10px; height: 10px; border-radius: 3px; background: var(--vital-hue); flex: none; }
+.hm-vital-val { font: 600 26px/1.1 var(--font-display); letter-spacing: -.02em; }
+.hm-vital-val small { font-size: 13px; font-weight: 500; color: var(--text-2); margin-left: 3px; letter-spacing: 0; }
+.hm-bar { position: relative; height: 28px; }
+.hm-track { position: absolute; left: 0; right: 0; top: 6px; height: 6px; border-radius: 3px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--border); }
+.hm-band { position: absolute; top: 6px; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--vital-hue) 45%, transparent); }
+.hm-mark { position: absolute; top: 3px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--vital-hue); box-shadow: 0 0 0 2px var(--surface); }
+.hm-tick { position: absolute; top: 16px; transform: translateX(-50%); font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.hm-vital-foot { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--text-2); }
+.hm-streak { font-size: 12.5px; color: var(--text); margin: 0; }
+.hm-vital.is-pending, .hm-vital.is-pending .hm-vital-foot { color: var(--text-3); }
+@media (min-width: 900px) {
+  .hm-vitals { display: grid; grid-template-columns: repeat(var(--hm-cols, 3), minmax(0, 1fr)); gap: 0 24px; }
+  .hm-vital { border-top: 0; padding-top: 4px; }
+}
+.rp-card-vitals { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 36px; margin-top: 2px; }
+.hm-vital-foot > span:last-child { white-space: nowrap; flex: none; }

@@ -54,6 +54,7 @@ src/
     metrics.js           METRIC REGISTRY + sleep-stage / stress-level palettes + delta rules
     insights.js          personal insight detectors
     homeLogic.js         Today/Morning logic (recovery estimate + breakdown, week grid, deltas)
+    health.js            health monitor: overnight vitals against your own 30-night normal range
     activities.js        activity helpers (type groups, pace, training effect, load)
     name.js              greeting-name resolution (local override, ignores Garmin UUIDs)
     prefs.js             UI preferences in localStorage + usePrefs()
@@ -211,7 +212,8 @@ linking to the Sync Center.
 `METRICS[key]` = `{ label, short, unit, pick(day), format(v), axis?(v), agg: 'mean'|'sum',
 better: 'up'|'down'|null, hue, domain?, band?(v) → {label, tone}, goal?(day), group, report }`.
 Home tiles, trend pages, reports, CSV export, insights and delta chips all read it, so a new key
-appears everywhere consistently. Also exported: `SLEEP_STAGES`, `STRESS_LEVELS` (validated palettes),
+appears everywhere consistently (Trends lists only keys you have data for, so a key like `spo2`
+stays hidden on watches that never record it). Also exported: `SLEEP_STAGES`, `STRESS_LEVELS` (validated palettes),
 `isMeaningfulDelta(key, delta)` (noise floor below which a change shows as "Same"), `deltaTone`.
 
 ## UI kit (`src/components/`, barrel in `index.js`)

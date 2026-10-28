@@ -23,7 +23,7 @@ by the user and kept on the device.
   - [x] Run it on the owner's key and record the findings (`GARMIN-API.md § Findings`, 2026-10-28).
 - **Phase 1 · Daily coach**
   - [x] A2 Recovery breakdown — what moved today's recovery (sleep, HRV, RHR, respiration) (Have)
-  - [ ] A3 Health monitor — RHR / HRV / respiration against the 30-day normal range; SpO₂ only if present (Have)
+  - [x] A3 Health monitor — RHR / HRV / respiration against the 30-day normal range; SpO₂ only if present (Have)
   - [ ] A5 Garmin sleep sub-scores — duration, stress, awakenings, restlessness, stage mix (Have — in sleep summaries)
   - [ ] A4 Sleep coach — 7-day sleep bank, tonight's need, bedtime planner from a wake time (Have)
   - [ ] A1 Effort score + daily target — strain-like 0–100 from training load and steps, target from recovery (Have)
@@ -82,4 +82,6 @@ by the user and kept on the device.
 - Garmin capability check in Sync Center (`e03dbf9`).
 - Capability findings → richer sleep/daily data, one recovery score (`4cc02cf`).
 - A2 Recovery breakdown: "What moved it" card on the Recovery report (any day via `?date=`),
-  linked from Today and Morning; overnight respiration added to the registry.
+  linked from Today and Morning; overnight respiration added to the registry (`eb581f7`).
+- A3 Health monitor: `#/reports/health` compares resting HR, HRV, overnight breathing (and SpO₂
+  when recorded) with your own 30-night normal range; status row on Today, card on Reports.

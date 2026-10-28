@@ -8,6 +8,7 @@ import { computeInsights } from '../lib/insights'
 import { latestValue, lastNDays } from '../data/select'
 import { useDisplayName, withName } from '../lib/name'
 import { usePrefs } from '../lib/prefs'
+import { healthMonitor, monitorSummary } from '../lib/health'
 import { bodyBatteryNow, deltaVs7, greetingFor, headlineFor, intensityWeek, latestActivity, recoveryFor, weekGrid, whenLabel } from '../lib/homeLogic'
 import { Badge, Button, Card, Empty, Icon, InstallHint, Meter, PageHeader, Ring, SectionTitle, StatTile, toast } from '../components'
 
@@ -79,6 +80,7 @@ export default function Today() {
   const has = Object.keys(days).length > 0 || activities.length > 0
   const rec = useMemo(() => recoveryFor(days, asOf, { sleepNeedHours }), [days, asOf, sleepNeedHours])
   const insights = useMemo(() => { try { return computeInsights(days, activities, { asOf }).slice(0, 2) } catch { return [] } }, [days, activities, asOf])
+  const vitals = useMemo(() => { const m = healthMonitor(days, asOf); return { m, s: monitorSummary(m) } }, [days, asOf])
   const wk = useMemo(() => intensityWeek(days, asOf), [days, asOf])
   const act = useMemo(() => latestActivity(activities), [activities])
   const name = useDisplayName()
@@ -120,6 +122,12 @@ export default function Today() {
         {rec.score != null && <a className="home-hero-link" href="#/reports/recovery"><span>What moved it</span><Icon name="chevron-right" size={18} /></a>}
       </div>
     </Card>
+
+    {vitals.s && <a className={`home-act home-vitals is-${vitals.s.tone}`} href="#/reports/health">
+      <span className="home-act-ico"><Icon name="shield" size={22} /></span>
+      <span className="home-act-text"><span className="home-act-label">Health monitor</span><span className="home-act-name">{vitals.s.title}</span><span className="home-act-sub">{[vitals.s.sub, whenLabel(vitals.m.date, asOf, true)].join(' · ')}</span></span>
+      <Icon name="chevron-right" size={18} />
+    </a>}
 
     <div className="home-tiles">
       <Tile days={days} asOf={asOf} metricKey="sleepScore" overnight href="#/sleep" sub={l => fmtDuration(l.record.sleep?.durationSec)} spark={undefined} />

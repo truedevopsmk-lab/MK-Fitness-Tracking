@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useStore } from '../state/store'
 import { href } from '../router'
-import { METRICS, deltaTone } from '../lib/metrics'
+import { METRICS, deltaTone, valueOf } from '../lib/metrics'
 import { dataBounds, latestValue, metricSeries } from '../data/select'
 import { summarize } from '../lib/stats'
 import { addDays, today } from '../lib/dates'
@@ -57,6 +57,7 @@ export default function Trends() {
     }
     const groups = []
     for (const k of Object.keys(METRICS)) {
+      if (!Object.values(days).some(d => valueOf(k, d) != null)) continue
       const g = METRICS[k].group
       let grp = groups.find(x => x.name === g)
       if (!grp) groups.push(grp = { name: g, keys: [] })

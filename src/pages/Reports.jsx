@@ -5,8 +5,10 @@ import { mean, sum } from '../lib/stats'
 import { fmtNumber } from '../lib/format'
 import { addDays, today } from '../lib/dates'
 import { recoverySeries } from '../lib/homeLogic'
+import { MIN_NIGHTS, healthMonitor } from '../lib/health'
 import { usePrefs } from '../lib/prefs'
 import Sparkline from '../charts/Sparkline'
+import Badge from '../components/Badge'
 import Icon from '../components/Icon'
 import Empty from '../components/Empty'
 import Card from '../components/Card'
@@ -24,13 +26,18 @@ const REPORTS = [
   { id: 'act', title: 'Activities', icon: 'activity', hue: 'intensity', to: '#/reports/activities', desc: 'Workouts by type, time and distance', custom: 'act' },
   { id: 'load', title: 'Training load', icon: 'flame', hue: 'intensity', to: '#/reports/training-load', desc: 'Load, intensity minutes and balance', custom: 'load' },
   { id: 'rec', title: 'Recovery', icon: 'battery', hue: 'readiness', to: '#/reports/recovery', desc: 'Recovery estimate, sleep, HRV and Body Battery together', custom: 'rec', label: 'avg recovery' },
+  { id: 'health', title: 'Health monitor', icon: 'shield', hue: 'heart', to: '#/reports/health', desc: 'Resting HR, HRV and breathing against your normal range', custom: 'health' },
 ]
 
 function useCards() {
   const days = useStore(s => s.days), acts = useStore(s => s.activities), { sleepNeedHours } = usePrefs()
   return useMemo(() => REPORTS.map(r => {
-    let series = [], value = null, sub = r.label
-    if (r.key || r.custom === 'rec') {
+    let series = [], value = null, sub = r.label, vitals, emptyText
+    if (r.custom === 'health') {
+      const m = healthMonitor(days, today())
+      value = m.total ? `${m.total - m.outside} of ${m.total}` : null; sub = 'vitals in your normal range'; vitals = m.vitals
+      if (m.pending.some(x => x.reason === 'no-range')) emptyText = `Range builds after ${MIN_NIGHTS} nights`
+    } else if (r.key || r.custom === 'rec') {
       series = r.key ? lastNDays(days, r.key, 7) : recoverySeries(days, addDays(today(), -6), today(), { sleepNeedHours })
       const avg = mean(series.map(p => p.value))
       value = avg == null ? null : `${fmtNumber(Math.round(avg))}${r.unit || ''}`
@@ -47,7 +54,7 @@ function useCards() {
         const s = sum(series.map(p => p.value)); value = s == null ? null : fmtNumber(Math.round(s)); sub = 'load, last 7 days'
       }
     }
-    return { ...r, series, value, sub }
+    return { ...r, series, value, sub, vitals, emptyText }
   }), [days, acts, sleepNeedHours])
 }
 
@@ -62,8 +69,10 @@ export default function Reports() {
       {cards.map(c => <a key={c.id} className="rp-card" href={c.to} style={{ '--rp-hue': `var(--hue-${c.hue})` }}>
         <div className="rp-card-top"><span className="rp-chip" aria-hidden="true"><Icon name={c.icon} size={18} /></span><h2>{c.title}</h2><Icon name="chevron-right" size={18} className="chev" /></div>
         <p className="rp-card-desc">{c.desc}</p>
-        <div className="rp-card-val">{c.value != null ? <><strong className="num">{c.value}</strong><span>{c.sub}</span></> : <span>No data in the last 7 days</span>}</div>
-        <Sparkline data={c.series} hue={c.hue} height={36} label={`${c.title}, last 7 days`} />
+        <div className="rp-card-val">{c.value != null ? <><strong className="num">{c.value}</strong><span>{c.sub}</span></> : <span>{c.emptyText || 'No data in the last 7 days'}</span>}</div>
+        {c.custom === 'health'
+          ? <div className="rp-card-vitals">{c.vitals.map(v => <Badge key={v.key} tone={v.tone}>{v.short}</Badge>)}</div>
+          : <Sparkline data={c.series} hue={c.hue} height={36} label={`${c.title}, last 7 days`} />}
       </a>)}
     </div>
   </div>

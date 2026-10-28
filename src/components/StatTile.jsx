@@ -17,7 +17,7 @@ export default function StatTile({ metricKey, value, sub, delta, deltaKey, delta
   const has = value != null && value !== ''
   const shown = !has ? '—' : typeof value === 'number' ? (m.format ? m.format(value) : String(value)) : value
   // Split a trailing unit ('62 ms', '54 bpm') so it renders smaller than the number.
-  const mm = typeof shown === 'string' && shown.match(/^(.*?\d)\s?(br\/min|ms|bpm|min|kg)$/)
+  const mm = typeof shown === 'string' && shown.match(/^(.*?\d)\s?(br\/min|ms|bpm|min|kg|%)$/)
   const main = mm ? mm[1] : shown, suffix = unit ?? (mm ? mm[2] : '')
   const b = band === false ? null : band || (typeof value === 'number' && m.band ? m.band(value) : null)
   const Tag = href ? 'a' : 'div'

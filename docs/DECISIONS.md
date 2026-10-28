@@ -51,6 +51,13 @@ Why things are the way they are. Read before "fixing" something that looks odd.
   change every number users have seen. HRV points top out at 85 so the card never implies that
   HRV above your usual is extra recovery. Respiration is the overnight (sleep) value only; waking
   respiration moves with activity and isn't comparable night to night.
+- **Health monitor normal range = your own 30 nights, mean ± 1 SD.** About two nights in three
+  land inside it, so "outside" is common enough to be informative but not alarming; streaks are what
+  the copy points at. The night itself is excluded from its own range, a range needs 14 nights, and a
+  per-metric minimum half-width (`MIN_HALF`) stops a very steady metric flagging 1-bpm wobbles.
+  Values are rounded to display precision before comparing so the verdict always matches the numbers
+  shown. HRV uses Garmin's balanced range when the night has one. SpO₂ appears only when the watch
+  records it. Outside in the "better" direction (lower RHR, higher HRV) is neutral, not good or bad.
 - **Delta noise floor.** Day-to-day changes like "−0.4" are noise; `isMeaningfulDelta()` turns them
   into "Same". Thresholds per metric in `MIN_DELTA` (`lib/metrics.js`).
 - **Insights are trends with sample sizes**, never causal or medical claims, and stay silent below

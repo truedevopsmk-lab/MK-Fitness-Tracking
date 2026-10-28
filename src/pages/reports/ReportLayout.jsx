@@ -107,25 +107,28 @@ export function WeekdayBars({ data, hue = 'steps', label, format = v => fmtNumbe
 /**
  * Compact single-series chart with its own label (TrendChart takes its label from the registry).
  *  data [{date,value,...}] · kind line|area|bar · domain [lo,hi] fixed · refLine { value, label } · line2 key of a second dashed series
+ *  rangeBand { low, high, flag, label } per-point shaded band: keys of the low/high numbers on each row, `flag` key marks points to dot, label for the tooltip
  */
-export function MiniTrend({ data, label, hue = 'steps', kind = 'line', height = 120, format = v => fmtNumber(v), domain, refLine, band, line2, line2Label = 'Average', xFormat, axisFormat, tipTitle, ariaLabel }) {
+export function MiniTrend({ data, label, hue = 'steps', kind = 'line', height = 120, format = v => fmtNumber(v), domain, refLine, band, rangeBand, line2, line2Label = 'Average', xFormat, axisFormat, tipTitle, ariaLabel }) {
   const t = useChartTheme()
   const color = t.hue(hue)
-  const vals = data.flatMap(p => [p.value, line2 ? p[line2] : null]).filter(num)
+  const vals = data.flatMap(p => [p.value, line2 ? p[line2] : null])
   if (refLine && num(refLine.value)) vals.push(refLine.value)
   if (band) vals.push(band.low, band.high)
-  let lo = vals.length ? Math.min(...vals) : 0, hi = vals.length ? Math.max(...vals) : 1
+  if (rangeBand) for (const p of data) vals.push(p[rangeBand.low], p[rangeBand.high])
+  const nums = vals.filter(num)
+  let lo = nums.length ? Math.min(...nums) : 0, hi = nums.length ? Math.max(...nums) : 1
   if (domain) [lo, hi] = domain
   else if (kind === 'bar') lo = Math.min(0, lo)
   else { const pad = (hi - lo) * .12 || 1; lo = Math.max(0, lo - pad); hi += pad }
   const { ticks, domain: dom } = niceTicks(lo, hi, 3)
   const tick = { fill: t.text3, fontSize: 11, fontFamily: t.fontUi }
   const lonely = i => num(data[i]?.value) && !num(data[i - 1]?.value) && !num(data[i + 1]?.value)
-  const dot = ({ cx, cy, index }) => lonely(index) && num(cx) ? <circle key={index} cx={cx} cy={cy} r={3} fill={color} stroke={t.surface} strokeWidth={2} /> : <g key={index} />
+  const dot = ({ cx, cy, index }) => (lonely(index) || (rangeBand && data[index]?.[rangeBand.flag])) && num(cx) ? <circle key={index} cx={cx} cy={cy} r={3} fill={color} stroke={t.surface} strokeWidth={2} /> : <g key={index} />
   const Tip = ({ active, payload }) => {
     const p = active && payload?.[0]?.payload
     if (!p) return null
-    return <TipCard title={(tipTitle || defaultTipTitle)(p.date)} rows={[{ color, value: num(p.value) ? format(p.value) : 'No data', label }, ...(line2 && num(p[line2]) ? [{ value: format(p[line2]), label: line2Label }] : [])]} />
+    return <TipCard title={(tipTitle || defaultTipTitle)(p.date)} rows={[{ color, value: num(p.value) ? format(p.value) : 'No data', label }, ...(rangeBand && num(p[rangeBand.low]) && num(p[rangeBand.high]) ? [{ value: `${format(p[rangeBand.low])}–${format(p[rangeBand.high])}`, label: rangeBand.label }] : []), ...(line2 && num(p[line2]) ? [{ value: format(p[line2]), label: line2Label }] : [])]} />
   }
   const common = { dataKey: 'value', stroke: color, strokeWidth: 2, strokeLinecap: 'round', connectNulls: false, isAnimationActive: false, dot, activeDot: { r: 4, fill: color, stroke: t.surface, strokeWidth: 2 } }
   return <div className="chart" role="img" aria-label={ariaLabel || `${label} chart`}>
@@ -137,6 +140,7 @@ export function MiniTrend({ data, label, hue = 'steps', kind = 'line', height = 
         {band && <ReferenceArea y1={band.low} y2={band.high} fill={color} fillOpacity={.12} stroke="none" ifOverflow="hidden" label={band.label ? { value: band.label, position: 'insideTopLeft', fill: t.text2, fontSize: 11, fontFamily: t.fontUi } : undefined} />}
         {refLine && num(refLine.value) && <ReferenceLine y={refLine.value} stroke={t.text2} strokeDasharray="4 4" strokeWidth={1} label={refLabel(refLine.label, 'insideTopRight', t)} />}
         <Tooltip content={<Tip />} cursor={kind === 'bar' ? { fill: t.grid } : { stroke: t.text3, strokeWidth: 1 }} isAnimationActive={false} wrapperStyle={{ outline: 'none', zIndex: 5 }} />
+        {rangeBand && <Area type="linear" dataKey={p => num(p[rangeBand.low]) && num(p[rangeBand.high]) ? [p[rangeBand.low], p[rangeBand.high]] : null} stroke="none" fill={color} fillOpacity={.14} connectNulls={false} isAnimationActive={false} dot={false} activeDot={false} />}
         {kind === 'bar' ? <Bar dataKey="value" fill={color} maxBarSize={24} radius={[4, 4, 0, 0]} isAnimationActive={false} />
           : kind === 'area' ? <Area type="linear" fill={color} fillOpacity={.1} {...common} /> : <Line type="linear" {...common} />}
         {line2 && <Line dataKey={line2} type="linear" stroke={t.text3} strokeWidth={1.5} strokeDasharray="4 4" dot={false} activeDot={false} connectNulls={false} isAnimationActive={false} />}

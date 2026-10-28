@@ -67,7 +67,8 @@ profile or user settings), so `prefs.sleepNeedHours` (Settings → Sleep need) i
   data): fine for high/low/charged/drained, too coarse for a smooth intraday line.
 - **Respiration** comes from sleep (`average/lowest/highestRespirationValue`) and `userSummary`
   (`avgWakingRespirationValue`, …). The dedicated respiration and SpO₂ endpoints return 404;
-  `userSummary.averageSpo2` is `null` without a pulse-ox reading, so SpO₂ tiles stay hidden.
+  `userSummary.averageSpo2` is `null` without a pulse-ox reading, so SpO₂ (`sleep.avgSpo2`, registry key
+  `spo2`) stays hidden until a value exists.
 - **Weight** may be grams (> 1000) or kg.
 - **Profile `displayName` is often a UUID** (e.g. `e0399703-3ad1-…`), not a name. `lib/name.js`
   ignores ID-like values; users set a local name in Settings → Profile. The activities list carries
