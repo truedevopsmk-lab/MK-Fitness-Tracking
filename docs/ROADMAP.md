@@ -100,4 +100,4 @@ by the user and kept on the device.
   card on Morning, Journal row on Today, `#/journal?date=`, included in JSON export/import (`22f769e`).
 - B2 Habit impact: `#/reports/habits` compares the night after each tag with logged days without it (5+ each way, sample sizes always shown, clear vs varies), "What stands out" lead, card on Reports, link from Journal (`fbf52bb`).
 - B3 Day status: Sick / Injured / Travelling / Break on Journal and Morning check-in; the day and the day after are left out of normal ranges, HRV/RHR baselines, usual effort, insights, habit impact and 7-day averages (`c85315f`).
-- B4 Counters: water, caffeine and alcohol counts with − / + on Today (for today) and on Journal (any day, with 30-day averages); counts alone don't check a day in, and the Alcohol count sets the Alcohol tag (`TBD`).
+- B4 Counters: water, caffeine and alcohol counts with − / + on Today (for today) and on Journal (any day, with 30-day averages); counts alone don't check a day in, and the Alcohol count sets the Alcohol tag (`651b79c`).
