@@ -59,6 +59,7 @@ src/
     timeline.js          one day's window (opens at last night's bedtime): sleep and workout segments, gap-broken HR and Body Battery, stats, hourly rows, events
     health.js            health monitor: overnight vitals against your own 30-night normal range
     habits.js            habit impact: the night after tagged days against logged days without the tag (≥ 5 each way, sample sizes, clear vs varies)
+    aiSummary.js         "Copy for AI" (Sync Center): plain-text summary of a day or range — daily table, workouts, vs the 30 days before, vitals, insights, a prompt; no name, ids or workout titles
     activities.js        activity helpers (type groups, pace, training effect, load)
     name.js              greeting-name resolution (local override, ignores Garmin UUIDs)
     prefs.js             UI preferences in localStorage + usePrefs()

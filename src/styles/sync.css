@@ -64,3 +64,8 @@
 .probe-fields[open] summary::after { transform: rotate(-135deg) translateY(-1px); }
 .probe-fields pre, .probe-report { margin: 0; font-family: var(--font-mono); font-size: 11.5px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); border-radius: var(--radius-xs); padding: 8px 10px; max-height: 220px; overflow: auto; color: var(--text-2); }
 .probe-report { display: block; width: 100%; box-sizing: border-box; margin-top: 12px; border: 1px solid var(--border); resize: vertical; }
+.ai-range { margin-bottom: 14px; }
+.ai-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.ai-dates .input { -webkit-appearance: none; appearance: none; display: flex; align-items: center; min-width: 0; font-family: var(--font-ui); }
+.ai-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; margin: 0 0 14px; font-size: 13px; color: var(--text-2); }
+.ai-meta-range { color: var(--text); font-weight: 600; font-size: 14px; }

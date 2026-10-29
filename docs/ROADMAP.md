@@ -43,8 +43,9 @@ by the user and kept on the device.
 - **Phase 4 · Reviews**
   - [ ] D1 Weekly review · D2 Goals + streaks · D3 Calendar heatmaps · D7 Share card
   - [ ] D4 Year in review · D5 Compare periods · D6 Correlation explorer · D8 Customise Today
-- **Undecided:** E1 "Copy for AI" anonymised summary · E2 in-app chat with your own LLM key (would send
-  data off the device, so opt-in only). Ask the owner before building.
+- [x] E1 "Copy for AI" — text summary of a day or range in Sync Center (built at the owner's request, 2026-10-29)
+- **Undecided:** E2 in-app chat with your own LLM key (would send data off the device, so opt-in only).
+  Ask the owner before building.
 - **Not planned:** smart alarm, widgets and push (iOS PWA limits), nutrition logging, blood work.
 
 ## Features
@@ -101,3 +102,4 @@ by the user and kept on the device.
 - B2 Habit impact: `#/reports/habits` compares the night after each tag with logged days without it (5+ each way, sample sizes always shown, clear vs varies), "What stands out" lead, card on Reports, link from Journal (`fbf52bb`).
 - B3 Day status: Sick / Injured / Travelling / Break on Journal and Morning check-in; the day and the day after are left out of normal ranges, HRV/RHR baselines, usual effort, insights, habit impact and 7-day averages (`c85315f`).
 - B4 Counters: water, caffeine and alcohol counts with − / + on Today (for today) and on Journal (any day, with 30-day averages); counts alone don't check a day in, and the Alcohol count sets the Alcohol tag (`651b79c`).
+- E1 Copy for AI: Sync Center → "Share with AI" copies (or shares) a text summary of today, 7/30/90 days or a custom range — daily table, workouts, comparison with the 30 days before, overnight vitals, insights and a prompt asking for advice; no name, Garmin ids or workout titles (`TBD`).

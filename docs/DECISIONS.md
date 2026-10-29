@@ -145,6 +145,13 @@ Why things are the way they are. Read before "fixing" something that looks odd.
   saved PIN's exact length so a 6-digit PIN isn't checked at 4 digits.
 - **Service worker never caches Garmin responses.** Health data is only in IndexedDB, which "Clear
   local data" fully removes.
+- **"Copy for AI" builds text on the device and only copies or shares it.** Nothing is sent anywhere until the
+  user pastes it or picks a share target, so it doesn't break the local-first rule (an in-app LLM chat, E2, would).
+  The text leaves out the display name, Garmin ids, workout titles (Garmin's default titles name the city) and raw
+  payloads; it reads only `days`, `activities` and `journal`. Values go through the metric registry, the recovery
+  estimate is marked "(est.)", insights keep their sample sizes, and the prompt asks for trends, not a diagnosis.
+  The "30 days before" comparison skips status days like every other baseline. Ranges are capped at 365 days
+  (≈ 110 KB of text), which fits in the major assistants' context.
 
 ## Tooling
 

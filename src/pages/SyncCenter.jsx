@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { useStore, actions } from '../state/store'
+import { useStore, useExcluded, actions } from '../state/store'
 import { usePrefs } from '../lib/prefs'
-import { fmtAgo, fmtDateTime, fmtDay, fmtNumber } from '../lib/format'
-import { today } from '../lib/dates'
+import { fmtAgo, fmtDateTime, fmtDay, fmtNumber, fmtWeekday } from '../lib/format'
+import { addDays, daysBetween, today } from '../lib/dates'
+import { MAX_DAYS, buildAiSummary, daysWithData } from '../lib/aiSummary'
 import { ENDPOINTS } from '../sync/endpoints'
 import { cancelSync, estimateFullSync, retryEndpoint, retryFailed, startSync } from '../sync/engine'
 import { isSessionValid, session, signOut } from '../sync/garmin'
@@ -17,6 +18,7 @@ import Icon from '../components/Icon'
 import Meter from '../components/Meter'
 import PageHeader from '../components/PageHeader'
 import SectionTitle from '../components/SectionTitle'
+import Segmented from '../components/Segmented'
 import '../styles/sync.css'
 
 const STATUS = {
@@ -150,6 +152,62 @@ function ProbeCard({ canSync, syncing, now }) {
   </Card>
 }
 
+const AI_RANGES = [{ value: 1, label: 'Today' }, { value: 7, label: '7D' }, { value: 30, label: '30D' }, { value: 90, label: '90D' }, { value: 'custom', label: 'Custom' }]
+const plural = (n, one, many = `${one}s`) => `${fmtNumber(n)} ${n === 1 ? one : many}`
+
+function AiCard({ demo }) {
+  const days = useStore(s => s.days), activities = useStore(s => s.activities), journal = useStore(s => s.journal)
+  const { sleepNeedHours } = usePrefs(), exclude = useExcluded(), now = today()
+  const [range, setRange] = useState(1)
+  const [custom, setCustom] = useState(() => ({ from: addDays(now, -6), to: now }))
+  const [text, setText] = useState(null)
+  const first = useMemo(() => Object.keys(days).sort()[0] || now, [days, now])
+  const { from, to } = useMemo(() => {
+    if (range !== 'custom') return { from: addDays(now, -(range - 1)), to: now }
+    const cap = d => !d || d > now ? now : d
+    let [a, b] = [cap(custom.from), cap(custom.to)].sort()
+    if (daysBetween(a, b) >= MAX_DAYS) a = addDays(b, -(MAX_DAYS - 1))
+    return { from: a, to: b }
+  }, [range, custom, now])
+  const withData = useMemo(() => daysWithData(days, from, to), [days, from, to])
+  const workouts = useMemo(() => activities.filter(a => a.day >= from && a.day <= to).length, [activities, from, to])
+  const n = daysBetween(from, to) + 1, empty = !withData && !workouts
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+  const label = from === to ? (from === now ? `Today, ${fmtWeekday(from)}` : fmtWeekday(from)) : `${fmtDay(from)} – ${fmtDay(to)} · ${plural(n, 'day')}`
+  const build = () => buildAiSummary({ days, activities, journal }, { from, to, sleepNeedHours, exclude }).text
+  const pick = v => { setRange(v); setText(null) }
+  const setDay = (k, v) => { setCustom(c => ({ ...c, [k]: v })); setText(null) }
+  const copy = async () => {
+    const t = build()
+    try {
+      await navigator.clipboard.writeText(t)
+      setText(null); toast('Copied — paste it into your AI assistant', { tone: 'good' })
+    } catch {
+      setText(t); toast('Select the text and copy it', { tone: 'neutral' })
+    }
+  }
+  const share = async () => {
+    const t = build()
+    try { await navigator.share({ title: 'My Garmin data', text: t }) } catch (e) {
+      if (e?.name !== 'AbortError') { setText(t); toast('Select the text and copy it', { tone: 'neutral' }) }
+    }
+  }
+  return <Card title="Copy for AI" subtitle="A text summary to paste into ChatGPT, Claude or another assistant">
+    <Segmented className="ai-range" value={range} options={AI_RANGES} onChange={pick} label="Days to include" />
+    {range === 'custom' && <div className="ai-dates">
+      <label className="field"><span className="field-label">From</span><input className="input" type="date" value={custom.from} min={first} max={now} onChange={e => setDay('from', e.target.value)} /></label>
+      <label className="field"><span className="field-label">To</span><input className="input" type="date" value={custom.to} min={first} max={now} onChange={e => setDay('to', e.target.value)} /></label>
+    </div>}
+    <p className="ai-meta"><span className="ai-meta-range">{label}</span><span>{empty ? 'No synced data in these days' : `${plural(withData, 'day')} with data · ${plural(workouts, 'workout')}`}</span></p>
+    <div className="sync-actions">
+      <Button variant="primary" size="lg" icon="copy" disabled={empty} onClick={copy}>Copy for AI</Button>
+      {canShare && <Button variant="secondary" size="lg" icon="share" disabled={empty} onClick={share}>Share</Button>}
+    </div>
+    {text && <textarea className="probe-report" rows={8} readOnly value={text} onFocus={e => e.target.select()} aria-label="Summary for AI" />}
+    <p className="sync-hint">Daily sleep, HRV, heart rate, Body Battery, stress, steps and training, your workouts and journal, a comparison with the 30 days before, and a prompt asking for advice. Your name, Garmin IDs and workout titles are left out. Nothing leaves this device until you paste or share it.{range === 'custom' && n === MAX_DAYS ? ` Up to ${MAX_DAYS} days at a time.` : ''}{demo ? ' You are viewing demo data, so this copies demo numbers.' : ''}</p>
+  </Card>
+}
+
 export default function SyncCenter() {
   const source = useStore(s => s.source), syncMeta = useStore(s => s.syncMeta), endpoints = useStore(s => s.endpoints)
   const sync = useStore(s => s.sync), log = useStore(s => s.log), days = useStore(s => s.days)
@@ -227,6 +285,9 @@ export default function SyncCenter() {
         {!valid && <div className="sync-connect"><ConnectForm compact onConnected={() => bump(n => n + 1)} /></div>}
       </Card>
     </>}
+
+    <SectionTitle>Share with AI</SectionTitle>
+    <AiCard demo={demo} />
 
     <SectionTitle>Data sources</SectionTitle>
     <div className="sync-groups">

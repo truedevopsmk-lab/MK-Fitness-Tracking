@@ -5,7 +5,7 @@ Then read this file. It holds the next piece's full spec (§3) and the steps tha
 
 ## 1. Where things stand
 
-- **Branch:** `v2-dashboard-overhaul`, clean, pushed (`4b48f75`), deployed to GitHub Pages and checked on the live site.
+- **Branch:** `v2-dashboard-overhaul`, pushed and deployed to GitHub Pages through E1 (see ROADMAP → Done), checked on the live site.
 - **`main` has not been merged.** Merging is the owner's call. After merging, remove `v2-dashboard-overhaul` from the
   `github-pages` environment's allowed branches (ROADMAP → Tech debt).
 
@@ -14,6 +14,7 @@ Then read this file. It holds the next piece's full spec (§3) and the steps tha
 - v2 overhaul, the Garmin capability check, and Phase 1: A1 Effort, A2 Recovery breakdown, A3 Health monitor, A4 Sleep coach,
   A5 Sleep sub-scores, A6 Resilience and A7 Day timeline.
 - Phase 2: B1 Daily tags, B2 Habit impact, B3 Day status and B4 Counters.
+- E1 Copy for AI (Sync Center), built at the owner's request.
 
 **Pending, in this order:**
 
@@ -23,7 +24,8 @@ Then read this file. It holds the next piece's full spec (§3) and the steps tha
 4. **C9 Gear mileage** (logged by the user). Outline in §4.
 5. **Phase 4:** D1 Weekly review, D2 Goals + streaks, D3 Calendar heatmaps, D7 Share card, D4 Year in review, D5 Compare periods,
    D6 Correlation explorer, D8 Customise Today. Outline in §5.
-6. **Undecided:** E1 "Copy for AI" and E2 in-app LLM chat. Both send data off the device, so **ask the owner first.**
+6. **Undecided:** E2 in-app LLM chat. It sends data off the device, so **ask the owner first.**
+   (E1 "Copy for AI" was built on 2026-10-29: Sync Center → "Share with AI", `src/lib/aiSummary.js`.)
 7. **Tech debt / hardening:** see the lists in `docs/ROADMAP.md`.
 
 ## 2. Steps that close out every piece
