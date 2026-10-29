@@ -27,7 +27,7 @@ Why things are the way they are. Read before "fixing" something that looks odd.
   with a tag against logged days without it (Habit impact) needs that difference, so removing the last tag keeps
   the entry and only "Clear day" deletes it.
 - **Journal import: newest edit wins, ties keep local.** An incoming entry replaces the local one only when it
-  has a later `updatedAt` and different tags.
+  has a later `updatedAt` and different tags, status, counts or check-in state.
 - **Day status leaves out the day and the day after.** A DayRecord holds the night ending that morning plus the daytime, so
   a status on D touches record D (daytime, often the onset night) and D+1 (the night after). Both are skipped in every baseline or
   comparison window (normal ranges, HRV/RHR baselines, usual effort, insights, habit impact, 7-day averages). The value of a status
@@ -36,7 +36,12 @@ Why things are the way they are. Read before "fixing" something that looks odd.
   Resilience's 14-day windows still count status days: they describe the current state, not a baseline.
 - **Demo journal has its own seed and follows sleep.** `generateDemoJournal` uses a separate RNG so `generateDemo`
   output is unchanged, and makes alcohol, late meals and late caffeine likelier before nights scoring under 80, and meditation and
-  stretching likelier before nights of 88 or more, so Habit impact has something to show. Yesterday and today stay unlogged to show the check-in prompt.
+  stretching likelier before nights of 88 or more, so Habit impact has something to show. Yesterday stays unlogged to show the check-in prompt; today holds counts only (not checked in). Counts come from a second RNG so the tag draws never move.
+- **Counts don't check a day in.** Tapping "+ water" at noon stores `checkedIn: false` on a counts-only entry, so it is not a
+  "logged day" for Journal stats, the Today prompt or Habit impact (whose "without" sample is logged days with the tag absent).
+  Tapping a tag, setting a status or pressing "Nothing to tag" / "Done" checks the day in; taking the last count back removes an entry that holds nothing else.
+- **The Alcohol count sets the Alcohol tag.** Counting a drink adds the tag so Habit impact sees it without double entry.
+  Removing the tag clears the count, and taking the count back to 0 removes the tag. Entry text drops the tag when the count is shown.
 
 ## Sync
 

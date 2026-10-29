@@ -9,7 +9,7 @@ import { fmtDuration } from '../lib/format'
 import { METRICS, SLEEP_STAGES, hrvStatusBand } from '../lib/metrics'
 import { latestValue } from '../data/select'
 import { bodyBatteryNow, deltaVs7, greetingFor, headlineFor, recommendationFor, recoveryFor, whenLabel } from '../lib/homeLogic'
-import { STATUSES, TAGS, checkinDay, statusInfo } from '../lib/journal'
+import { STATUSES, TAGS, checkinDay, isCheckedIn, statusInfo } from '../lib/journal'
 import { Badge, Button, Card, Empty, Icon, Ring, TagChips, dayLabel } from '../components'
 
 const hueStyle = h => ({ '--m-hue': `var(--hue-${h})` })
@@ -27,9 +27,9 @@ function CheckIn() {
     <h3 className="jr-group">Day status</h3>
     <TagChips label={`Day status for ${when}`} options={STATUSES} selected={entry?.status ? [entry.status] : []} onToggle={k => actions.setStatus(day, entry?.status === k ? null : k)} />
     <div className="jr-foot jr-foot-rule">
-      <span className="jr-status">{!entry ? 'Stays on this device' : parts.length ? `${parts.join(' · ')} saved` : 'Checked in · nothing to tag'}</span>
+      <span className="jr-status">{!isCheckedIn(entry) ? 'Stays on this device' : parts.length ? `${parts.join(' · ')} saved` : 'Checked in · nothing to tag'}</span>
       <span className="jr-actions">
-        {!entry && <Button size="sm" variant="secondary" onClick={() => actions.setJournal(day, { tags: [] })}>Nothing to tag</Button>}
+        {!isCheckedIn(entry) && <Button size="sm" variant="secondary" onClick={() => actions.checkIn(day)}>{n ? 'Done' : 'Nothing to tag'}</Button>}
         <Button size="sm" variant="ghost" href={`#/journal?date=${day}`}>All tags</Button>
       </span>
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import '../styles/home.css'
-import { getState, useExcluded, useStore } from '../state/store'
+import { actions, getState, useExcluded, useStore } from '../state/store'
 import { today, daysBetween } from '../lib/dates'
 import { fmtDay, fmtDuration, fmtNumber } from '../lib/format'
 import { METRICS, hrvStatusBand, isMeaningfulDelta } from '../lib/metrics'
@@ -12,8 +12,8 @@ import { MIN_DAYS, effortFor, effortStatus, effortTarget, statusText } from '../
 import { healthMonitor, monitorSummary } from '../lib/health'
 import { bankText, clockFromNorm, sleepCoach } from './sleepLogic'
 import { bodyBatteryNow, deltaVs7, greetingFor, headlineFor, intensityWeek, latestActivity, recoveryFor, weekGrid, whenLabel } from '../lib/homeLogic'
-import { checkinDay, entryText, journalStats } from '../lib/journal'
-import { Badge, Button, Card, Empty, Icon, InstallHint, Meter, PageHeader, Ring, SectionTitle, StatTile, toast } from '../components'
+import { COUNTERS, checkinDay, entryText, isCheckedIn, journalStats } from '../lib/journal'
+import { Badge, Button, Card, Empty, Icon, InstallHint, Meter, PageHeader, Ring, SectionTitle, StatTile, Stepper, toast } from '../components'
 
 const trend = key => `#/trends/${key}`
 const lastDay = (days, asOf) => Object.keys(days).filter(d => d <= asOf).sort().at(-1)
@@ -97,10 +97,29 @@ function JournalRow({ journal, asOf }) {
   return <a className="home-act home-journal" href="#/journal">
     <span className="home-act-ico"><Icon name="tag" size={22} /></span>
     <span className="home-act-text"><span className="home-act-label">Journal</span>
-      <span className="home-act-name">{!entry ? `Check in for ${when}` : entryText(entry) || `Nothing tagged ${when}`}</span>
-      <span className="home-act-sub">{!entry ? 'Alcohol, late meals, travel and more · stays on this device' : `Logged ${st.logged} of the last 7 days`}</span></span>
+      <span className="home-act-name">{!isCheckedIn(entry) ? `Check in for ${when}` : entryText(entry) || `Nothing tagged ${when}`}</span>
+      <span className="home-act-sub">{!isCheckedIn(entry) ? 'Alcohol, late meals, travel and more · stays on this device' : `Logged ${st.logged} of the last 7 days`}</span></span>
     <Icon name="chevron-right" size={18} />
   </a>
+}
+
+function CountsRow({ journal, asOf }) {
+  return <section className="home-counts" aria-label="Today’s counts">
+    <div className="home-counts-head">
+      <span className="home-act-label">Today’s counts</span>
+      <a className="home-counts-link" href={`#/journal?date=${asOf}`}>Journal<Icon name="chevron-right" size={16} /></a>
+    </div>
+    <div className="home-counts-grid">
+      {COUNTERS.map(c => {
+        const n = journal[asOf]?.counts?.[c.key] || 0
+        return <div key={c.key} className="home-count">
+          <span className="home-count-label">{c.label}</span>
+          <span className="home-count-val"><strong className="num">{n}</strong> {n === 1 ? c.unit[0] : c.unit[1]}</span>
+          <Stepper size="sm" showValue={false} value={n} max={c.max} label={c.label} decLabel={`Remove one ${c.noun[0]}`} incLabel={`Add one ${c.noun[0]}`} onChange={v => actions.setCount(asOf, c.key, v)} />
+        </div>
+      })}
+    </div>
+  </section>
 }
 
 function TonightRow({ coach }) {
@@ -182,6 +201,7 @@ export default function Today() {
 
     {coach.has && coach.plan && <TonightRow coach={coach} />}
     <JournalRow journal={journal} asOf={asOf} />
+    <CountsRow journal={journal} asOf={asOf} />
 
     <div className="home-tiles">
       <Tile days={days} asOf={asOf} metricKey="sleepScore" overnight href="#/sleep" sub={l => fmtDuration(l.record.sleep?.durationSec)} spark={undefined} />

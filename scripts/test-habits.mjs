@@ -166,4 +166,17 @@ assert.equal(MIN_EACH, 5)
   assert.equal(habitImpact(days, j2, from, to, { exclude: new Set() }).skipped, 0)
 }
 
+// counts-only days are not logged and are not "without" days
+{
+  const spec = [...rep(6, () => ({ tags: ['alcohol'], next: { score: 70 } })), ...rep(8, () => ({ tags: [], next: { score: 80 } }))]
+  const { days, journal, from, to } = build(spec)
+  const base = habitImpact(days, journal, from, to)
+  const extra = addDays(START, 40)
+  const j2 = { ...journal, [extra]: { date: extra, tags: [], counts: { water: 4 }, checkedIn: false, updatedAt: 0 } }
+  const d2 = { ...days, ...toMap([rec(addDays(extra, 1), { score: 10 })]) }
+  const x = habitImpact(d2, j2, from, addDays(extra, 2))
+  assert.equal(x.logged, base.logged)
+  assert.equal(x.tags[0].outcomes.sleepScore.nWithout, base.tags[0].outcomes.sleepScore.nWithout)
+}
+
 console.log('habits: ok')

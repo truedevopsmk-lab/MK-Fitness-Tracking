@@ -81,7 +81,7 @@ Everything is keyed by **local calendar day** (`'YYYY-MM-DD'`, see `lib/dates.js
 - **DayRecord** — one per day, made of optional sections, each optional field possibly `null`:
   `steps`, `stress`, `bodyBattery`, `sleep`, `hrv`, `heartRate`, `respiration`, `movement`,
   `intensity`, `readiness`, `weight`, `training` (derived from that day's activities, never fetched).
-- **JournalEntry** — `{ date, tags, status?, updatedAt }`, entered by the user and kept in its own `journal` store. `status` (`sick | injured | travelling | break`) marks a day left out of baselines: `excludedDates(journal)` (`lib/journal.js`) returns those dates plus the day after each, cached per journal object, and pages read it with `useExcluded()` and pass it as `exclude` to the baseline functions.
+- **JournalEntry** — `{ date, tags, status?, counts?, checkedIn?, updatedAt }`, entered by the user and kept in its own `journal` store. `status` (`sick | injured | travelling | break`) marks a day left out of baselines: `excludedDates(journal)` (`lib/journal.js`) returns those dates plus the day after each, cached per journal object, and pages read it with `useExcluded()` and pass it as `exclude` to the baseline functions. `counts` (`{ water?, caffeine?, alcohol? }`, positive whole numbers) holds drinks counted for the day. `checkedIn: false` appears only on an entry with counts that the user never checked in; absent means checked in, so counts alone don't make a logged day.
   Never part of a DayRecord and never touched by sync. `tags: []` means "checked in, nothing to tag".
   `heartRate.samples` is intraday HR in 10-minute buckets (`[bucketTs, bpm]`, only with ≥ 2 buckets);
   `sleep.subScores` holds Garmin's per-component sleep qualifiers (duration, stress, awakenings,
@@ -115,7 +115,7 @@ One plain object with subscribers; read with `useStore(selector)`, write only th
 | `sync` | live progress `{ running, mode, phase, done, total, current, rateLimitedUntil, message }` |
 | `log` | last 200 sync log lines |
 
-Actions: `init`, `applyDays`, `applyActivities`, `setProfile`, `setJournal`, `toggleTag`, `setStatus`, `clearJournalDay`, `applyJournal`, `setSync`, `resetSync`, `setEndpoint`,
+Actions: `init`, `applyDays`, `applyActivities`, `setProfile`, `setJournal`, `toggleTag`, `setStatus`, `checkIn`, `setCount`, `clearJournalDay`, `applyJournal`, `setSync`, `resetSync`, `setEndpoint`,
 `setSyncMeta`, `log`, `importData`, `clearLocalData`, `switchSource`.
 
 > **Selector rule:** a selector must return an existing reference or a primitive
@@ -240,6 +240,7 @@ stays hidden on watches that never record it). Also exported: `SLEEP_STAGES`, `S
 | `PageHeader`, `SectionTitle`, `KeyValue`, `DataTable`, `MissingNote` | layout + data display |
 | `Badge`/`StatusPill`, `Button`, `Empty`, `Icon` | basics (`Icon` is an inline SVG set) |
 | `TagChips` | toggle chips for journal tags (check icon when on) |
+| `Stepper` | − value + control for small whole numbers (counters) |
 | `Sheet`, `ConfirmDialog`, `toast()` + `Toaster` | overlays and feedback |
 | `PullToRefresh`, `InstallHint`, `ConnectForm`, `ErrorBoundary`, `LockScreen` | app-level |
 

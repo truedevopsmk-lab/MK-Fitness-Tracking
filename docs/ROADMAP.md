@@ -33,7 +33,7 @@ by the user and kept on the device.
   - [x] B1 Daily tags (alcohol, late meal, caffeine, travel, …) with a quick morning check-in
   - [x] B2 Habit impact — ≥ 5 days with and ≥ 5 without before showing a difference, with sample sizes
   - [x] B3 Day status — sick / injured / travelling / break, excluded from baselines
-  - [ ] B4 Counters — water, caffeine, alcohol
+  - [x] B4 Counters — water, caffeine, alcohol
 - **Phase 3 · Training**
   - [ ] C1 Fitness / fatigue / form (Have) · C2 Training status from it (Have) · C3 Intensity mix 80/20 (Have)
   - [ ] C4 Personal records from synced activities (Have) · C7 Race predictor, computed locally (Have)
@@ -100,3 +100,4 @@ by the user and kept on the device.
   card on Morning, Journal row on Today, `#/journal?date=`, included in JSON export/import (`22f769e`).
 - B2 Habit impact: `#/reports/habits` compares the night after each tag with logged days without it (5+ each way, sample sizes always shown, clear vs varies), "What stands out" lead, card on Reports, link from Journal (`fbf52bb`).
 - B3 Day status: Sick / Injured / Travelling / Break on Journal and Morning check-in; the day and the day after are left out of normal ranges, HRV/RHR baselines, usual effort, insights, habit impact and 7-day averages (`c85315f`).
+- B4 Counters: water, caffeine and alcohol counts with − / + on Today (for today) and on Journal (any day, with 30-day averages); counts alone don't check a day in, and the Alcohol count sets the Alcohol tag (`TBD`).

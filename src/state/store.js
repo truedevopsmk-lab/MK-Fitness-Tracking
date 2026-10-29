@@ -10,7 +10,7 @@
 // to IndexedDB before the returned promise resolves.
 import { useSyncExternalStore } from 'react'
 import * as db from '../data/db.js'
-import { excludedDates, makeEntry, mergeJournal, toggleTag as toggleTagPure } from '../lib/journal.js'
+import { countPatch, excludedDates, isEmptyEntry, makeEntry, mergeJournal, tagPatch } from '../lib/journal.js'
 import { mergeActivities, mergeDays, mergeSection } from '../data/merge.js'
 
 export const IDLE_SYNC = { running: false, mode: null, phase: '', done: 0, total: 0, current: null, startedAt: null, rateLimitedUntil: null, message: '' }
@@ -117,8 +117,15 @@ export const actions = {
     return entry
   },
 
-  toggleTag: (date, key) => actions.setJournal(date, { tags: toggleTagPure(state.journal[date]?.tags, key) }),
-  setStatus: (date, status) => actions.setJournal(date, { status }),
+  toggleTag: (date, key) => actions.setJournal(date, tagPatch(state.journal[date], key)),
+  setStatus: (date, status) => actions.setJournal(date, { status, checkedIn: true }),
+  /** "Nothing to tag" / "Done": check the day in, keeping any tags already there. */
+  checkIn: date => actions.setJournal(date, { tags: state.journal[date]?.tags ?? [], checkedIn: true }),
+  async setCount(date, key, n) {
+    const patch = countPatch(state.journal[date], key, n)
+    if (isEmptyEntry(makeEntry(date, patch, state.journal[date]))) return actions.clearJournalDay(date)
+    return actions.setJournal(date, patch)
+  },
 
   /** Remove a day from the journal (back to "not logged"). */
   async clearJournalDay(date) {

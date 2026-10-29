@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { STATUSES, TAGS, TAG_GROUPS, TAG_RE, checkinDay, cleanStatus, cleanTags, entryText, excludedDates, journalStats, leftOutText, makeEntry, mergeJournal, recentDays, statusInfo, statusSummary, tagInfo, tagLabels, toggleTag } from '../src/lib/journal.js'
+import { COUNTERS, STATUSES, TAGS, TAG_GROUPS, TAG_RE, checkinDay, cleanCounts, cleanStatus, cleanTags, countPatch, countStats, entryText, excludedDates, isCheckedIn, isEmptyEntry, journalStats, leftOutText, makeEntry, mergeJournal, recentDays, statusInfo, statusSummary, tagInfo, tagLabels, tagPatch, toggleTag } from '../src/lib/journal.js'
 import { generateDemo, generateDemoJournal } from '../src/data/demo.js'
 import { addDays, parseDay, today } from '../src/lib/dates.js'
 
@@ -70,7 +70,8 @@ assert.deepEqual(generateDemoJournal(Object.fromEntries(days.map(d => [d.date, d
 assert.equal(JSON.stringify(generateDemo()), before)
 assert.ok(a.length >= 80 && a.length <= 110, `entries ${a.length}`)
 const yest = addDays(today(), -1)
-assert.ok(a.every(e => e.date < yest))
+assert.ok(a.filter(e => e.date !== today()).every(e => e.date < yest))
+assert.ok(!a.some(e => e.date === yest))
 assert.ok(a.every(e => e.tags.every(t => keys.includes(t))))
 const share = list => list.filter(e => e.tags.includes('alcohol')).length / list.length
 const wk = e => [5, 6].includes(parseDay(e.date).getDay())
@@ -124,6 +125,77 @@ assert.equal(entryText({ tags: [] }), ''); assert.equal(entryText(null), '')
   assert.ok(j.filter(e => e.status === 'sick').every(e => e.tags.length === 0))
   assert.deepEqual(j.map(e => e.date), j.map(e => e.date).sort())
   assert.equal(new Set(j.map(e => e.date)).size, j.length)
+}
+
+// counts
+assert.deepEqual(COUNTERS.map(c => c.key), ['water', 'caffeine', 'alcohol'])
+assert.deepEqual(cleanCounts({ water: 6, caffeine: 0, alcohol: 2.4, juice: 3 }), { water: 6, alcohol: 2 })
+assert.deepEqual(cleanCounts({ water: 99 }), { water: 30 })
+for (const v of [{ water: '6' }, {}, null, [], { water: -1 }]) assert.equal(cleanCounts(v), null)
+{
+  const d = '2026-10-01'
+  assert.deepEqual(makeEntry(d, { counts: { water: 3 } }, null, 1), { date: d, tags: [], counts: { water: 3 }, updatedAt: 1 })
+  assert.ok(!('counts' in makeEntry(d, { counts: { water: 0, caffeine: 0 } }, null, 1)))
+  assert.ok(!('checkedIn' in makeEntry(d, { checkedIn: true }, null, 1)))
+  assert.equal(makeEntry(d, { checkedIn: false }, null, 1).checkedIn, false)
+
+  assert.deepEqual(countPatch(null, 'water', 1), { counts: { water: 1 }, checkedIn: false })
+  const ci = { date: d, tags: ['lateMeal'], updatedAt: 1 }
+  let p = countPatch(ci, 'alcohol', 2)
+  assert.deepEqual(p.tags, ['alcohol', 'lateMeal']); assert.ok(!('checkedIn' in p)); assert.deepEqual(p.counts, { alcohol: 2 })
+  const withAlc = { ...ci, tags: ['alcohol', 'lateMeal'], counts: { alcohol: 2 } }
+  assert.deepEqual(countPatch(withAlc, 'alcohol', 0).tags, ['lateMeal'])
+  assert.ok(!('tags' in countPatch(ci, 'water', 3)))
+  assert.ok(!('tags' in countPatch({ ...ci, counts: { water: 3 } }, 'water', 0)))
+  assert.equal(countPatch(ci, 'water', 99).counts.water, 30)
+  assert.equal(countPatch(ci, 'water', -4).counts.water, 0)
+  assert.deepEqual(countPatch(ci, 'nope', 1), {})
+
+  p = tagPatch({ ...withAlc, counts: { alcohol: 3 } }, 'alcohol')
+  assert.equal(p.counts.alcohol, 0); assert.equal(p.checkedIn, true); assert.deepEqual(p.tags, ['lateMeal'])
+  p = tagPatch({ date: d, tags: [], counts: { alcohol: 3 } }, 'alcohol')
+  assert.ok(!('counts' in p)); assert.deepEqual(p.tags, ['alcohol'])
+  const only = makeEntry(d, { counts: { water: 2 }, checkedIn: false }, null, 1)
+  p = tagPatch(only, 'nap'); assert.equal(p.checkedIn, true)
+  const after = makeEntry(d, p, only, 2)
+  assert.ok(!('checkedIn' in after)); assert.ok(isCheckedIn(after)); assert.deepEqual(after.counts, { water: 2 })
+
+  assert.equal(isEmptyEntry({ date: d, tags: [], checkedIn: false }), true)
+  assert.equal(isEmptyEntry({ date: d, tags: [] }), false)
+  assert.equal(isEmptyEntry({ date: d, tags: [], checkedIn: false, counts: { water: 1 } }), false)
+  assert.equal(isEmptyEntry(makeEntry(d, countPatch(only, 'water', 0), only, 3)), true)
+  assert.equal(isCheckedIn(null), false); assert.equal(isCheckedIn({ tags: [] }), true)
+
+  assert.equal(entryText({ status: 'sick', tags: ['alcohol', 'lateMeal'], counts: { water: 6, alcohol: 2 } }), 'Sick · Late meal · 6 glasses of water, 2 alcoholic drinks')
+  assert.equal(entryText({ tags: ['alcohol'], counts: { water: 1 } }), 'Alcohol · 1 glass of water')
+  assert.equal(entryText({ tags: ['alcohol'], counts: { alcohol: 0 } }), 'Alcohol')
+
+  const base = { [d]: { date: d, tags: ['nap'], counts: { water: 2 }, updatedAt: 10 } }
+  let m = mergeJournal(base, [{ date: d, tags: ['nap'], counts: { water: 5 }, updatedAt: 20 }])
+  assert.equal(m.journal[d].counts.water, 5); assert.equal(m.changed.length, 1)
+  m = mergeJournal(base, [{ date: d, tags: ['nap'], counts: { water: 2 }, updatedAt: 20 }])
+  assert.equal(m.journal, base)
+  m = mergeJournal({}, [{ date: d, tags: [], counts: { water: -2, juice: 4, caffeine: 1.2 }, updatedAt: 1 }])
+  assert.deepEqual(m.journal[d].counts, { caffeine: 1 })
+  m = mergeJournal({}, [{ date: d, tags: [], counts: { water: 1 }, checkedIn: false, updatedAt: 1 }])
+  assert.equal(m.journal[d].checkedIn, false)
+  m = mergeJournal({}, [{ date: d, tags: [], checkedIn: 'no', updatedAt: 1 }])
+  assert.ok(!('checkedIn' in m.journal[d]))
+  m = mergeJournal({ [d]: { date: d, tags: [], counts: { water: 1 }, checkedIn: false, updatedAt: 1 } }, [{ date: d, tags: [], counts: { water: 1 }, updatedAt: 5 }])
+  assert.ok(!('checkedIn' in m.journal[d]))
+
+  const cj = {
+    '2026-10-10': { date: '2026-10-10', tags: [], counts: { water: 5 }, checkedIn: false, updatedAt: 1 },
+    '2026-10-09': { date: '2026-10-09', tags: [], counts: { water: 6, caffeine: 2 }, updatedAt: 1 },
+    '2026-10-08': { date: '2026-10-08', tags: [], counts: { water: 8 }, updatedAt: 1 },
+    '2026-09-01': { date: '2026-09-01', tags: [], counts: { water: 30 }, updatedAt: 1 },
+  }
+  assert.equal(journalStats(cj, '2026-10-10', 7).logged, 2)
+  assert.deepEqual(countStats(cj, '2026-10-10', 7), [{ key: 'water', label: 'Water', days: 3, avg: 6.3 }, { key: 'caffeine', label: 'Caffeine', days: 1, avg: 2 }, { key: 'alcohol', label: 'Alcohol', days: 0, avg: null }])
+  const dj = generateDemoJournal(generateDemo().days), t = dj.find(e => e.date === today())
+  assert.ok(dj.filter(e => e.counts?.alcohol).every(e => e.tags.includes('alcohol')))
+  assert.ok(dj.some(e => e.counts?.alcohol)); assert.ok(t && !isCheckedIn(t)); assert.deepEqual(t.counts, { water: 3, caffeine: 2 })
+  assert.deepEqual(dj.map(e => e.date), dj.map(e => e.date).sort())
 }
 
 console.log('journal: ok')

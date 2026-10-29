@@ -2,7 +2,7 @@
 import { addDays, eachDay } from './dates.js'
 import { METRICS, deltaTone, isMeaningfulDelta, valueOf } from './metrics.js'
 import { mean, stdev } from './stats.js'
-import { cleanTags, excludedDates, tagInfo } from './journal.js'
+import { cleanTags, excludedDates, isCheckedIn, tagInfo } from './journal.js'
 import { recoveryFor } from './homeLogic.js'
 
 export const MIN_EACH = 5
@@ -44,7 +44,7 @@ function compare(o, w, wo, min) {
 
 /** Per tag and outcome: the night after tagged days against the night after logged days without the tag. */
 export function habitImpact(days, journal, from, to, { sleepNeedHours = 8, min = MIN_EACH, exclude = excludedDates(journal) } = {}) {
-  const logged = eachDay(from, to).filter(d => journal[d])
+  const logged = eachDay(from, to).filter(d => isCheckedIn(journal[d]))
   // a logged day whose following night is excluded (the status day itself, or the day before one) says nothing about the tag
   const kept = logged.filter(d => !exclude.has(addDays(d, 1)))
   const entries = kept.map(date => ({ date, tags: cleanTags(journal[date].tags), night: nightAfter(days, date, { sleepNeedHours, exclude }) }))

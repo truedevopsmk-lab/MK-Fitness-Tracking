@@ -92,6 +92,8 @@ export const SCHEMA_VERSION = 1
  * @property {string} date       local YYYY-MM-DD the tags belong to
  * @property {string[]} tags
  * @property {'sick'|'injured'|'travelling'|'break'} [status]  day status; this day and the day after are left out of baselines
+ * @property {{water?: number, caffeine?: number, alcohol?: number}} [counts]  whole drinks counted for the day; omitted when empty
+ * @property {false} [checkedIn]  present only when the entry holds counts but the day was never checked in; absent means checked in
  * @property {number} updatedAt  epoch ms of the last edit
  *
  * @typedef {Object} Profile

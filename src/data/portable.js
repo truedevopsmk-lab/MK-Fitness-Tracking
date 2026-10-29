@@ -2,7 +2,7 @@
 import { SCHEMA_VERSION } from './schema.js'
 import { METRICS, METRIC_KEYS } from '../lib/metrics.js'
 import { toCsv } from '../lib/csv.js'
-import { cleanStatus, cleanTags } from '../lib/journal.js'
+import { normalEntry } from '../lib/journal.js'
 
 export const EXPORT_APP = 'mk-fitness'
 export const EXPORT_FORMAT = 1
@@ -58,8 +58,7 @@ export function parseImport(text) {
     if (!e || typeof e !== 'object' || Array.isArray(e)) fail(`Journal entry ${i + 1} is not an object.`)
     if (!validDay(e.date)) fail(`Journal entry ${i + 1} has an invalid date.`)
     if (!Array.isArray(e.tags)) fail(`Journal entry ${i + 1} has no tags list.`)
-    const { status, ...rest } = e, s = cleanStatus(status)
-    return { ...rest, tags: cleanTags(e.tags), updatedAt: Number.isFinite(e.updatedAt) ? e.updatedAt : 0, ...(s ? { status: s } : {}) }
+    return normalEntry(e)
   })
 
   const keys = [...days.map(d => d.date), ...activities.map(a => a.day).filter(Boolean), ...journal.map(e => e.date)].sort()

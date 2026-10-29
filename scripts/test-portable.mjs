@@ -57,3 +57,11 @@ assert.ok(csv[1].startsWith('2026-10-01,82,27000'))
 const acsv = activitiesToCsv(activities).split('\r\n')
 assert.ok(acsv[1].includes('"Run, easy"'))
 console.log('portable: ok')
+
+{
+  const cj = { ...journal, '2026-10-04': { date: '2026-10-04', tags: [], counts: { water: 4 }, checkedIn: false, updatedAt: 3 } }
+  const back2 = parseImport(JSON.stringify(buildExport({ ...state, journal: cj }))).journal.find(e => e.date === '2026-10-04')
+  assert.deepEqual(back2.counts, { water: 4 }); assert.equal(back2.checkedIn, false)
+  const junk = parseImport(JSON.stringify({ ...ex, journal: [{ date: '2026-10-01', tags: [], counts: { water: '3', caffeine: 2.6, x: 1 }, checkedIn: 'no' }] })).journal[0]
+  assert.deepEqual(junk.counts, { caffeine: 3 }); assert.ok(!('checkedIn' in junk))
+}

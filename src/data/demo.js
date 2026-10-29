@@ -196,7 +196,7 @@ function bbSamples(dayStart, low, start, wakeTs, _sleepStart, charged, rand) {
   return out.filter(s => s[0] <= Date.now())
 }
 
-/** Deterministic demo journal: 120 days ending 2 days ago (yesterday and today stay unlogged), correlated with the next night's sleep. */
+/** Deterministic demo journal: 120 days ending 2 days ago (yesterday stays unlogged; today has counts only), correlated with the next night's sleep, with water, caffeine and alcohol counts. */
 export function generateDemoJournal(days, seed = 4242) {
   const rand = rng(seed)
   const list = (Array.isArray(days) ? days : Object.values(days)).slice().sort((a, b) => a.date.localeCompare(b.date))
@@ -227,5 +227,16 @@ export function generateDemoJournal(days, seed = 4242) {
       byDay.set(date, e)
     }
   }
-  return [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date))
+  // counts use their own rng so the tag draws above are unchanged
+  const crand = rng(seed + 7)
+  const sorted = [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date))
+  for (const e of sorted) {
+    const counts = {}
+    if (crand() < .85) counts.water = 4 + Math.floor(crand() * 6)
+    if (crand() < .9) counts.caffeine = 1 + Math.floor(crand() * 4)
+    if (e.tags.includes('alcohol')) counts.alcohol = 1 + Math.floor(crand() * 4)
+    if (Object.keys(counts).length) e.counts = counts
+  }
+  sorted.push({ date: today(), tags: [], counts: { water: 3, caffeine: 2 }, checkedIn: false, updatedAt: parseDay(today()).getTime() + 10 * 3600e3 })
+  return sorted
 }
