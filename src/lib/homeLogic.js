@@ -12,15 +12,20 @@ export const recommendationFor = score => score == null ? 'Sync last night’s d
     : score >= 50 ? 'Recovery is middling. A steady workout or a lighter day suits it.'
       : 'Recovery is low. Favor rest, easy movement and an early night.'
 
-/** HRV vs its own baseline: ratio of last night to the 7-day average (Garmin's weeklyAvg, else our own). */
-export function hrvRatio(days, hrv) {
+/** HRV vs its own baseline: ratio of last night to the 7-day average (Garmin's weeklyAvg, else our own; our own when a status day is in the window). */
+export function hrvRatio(days, hrv, { exclude } = {}) {
   if (!hrv) return null
-  const rec = days[hrv.date]
-  let base = rec?.hrv?.weeklyAvg
-  if (base == null) {
-    const prev = []
-    for (let i = 1; i <= 7; i += 1) prev.push(valueOf('hrv', days[addDays(hrv.date, -i)]))
-    base = prev.filter(v => v != null).length >= 3 ? mean(prev) : null
+  let base = days[hrv.date]?.hrv?.weeklyAvg
+  const prev = []
+  let skipped = false
+  for (let i = 1; i <= 7; i += 1) {
+    const d = addDays(hrv.date, -i)
+    if (exclude?.has(d)) { skipped = true; continue }
+    prev.push(valueOf('hrv', days[d]))
+  }
+  if (base == null || skipped) {
+    const own = prev.filter(v => v != null).length >= 3 ? mean(prev) : null
+    if (own != null || base == null) base = own
   }
   return base ? { ratio: hrv.value / base, base } : null
 }
@@ -28,7 +33,7 @@ export function hrvRatio(days, hrv) {
 const needOf = (s, sleepNeedHours) => s?.needSec > 0 ? s.needSec : sleepNeedHours * 3600
 
 /** Everything the recovery score is built from, computed once for recoveryFor and recoveryBreakdown. */
-function recoveryModel(days, asOf, { sleepNeedHours = 8, lookbackDays = 2 } = {}) {
+function recoveryModel(days, asOf, { sleepNeedHours = 8, lookbackDays = 2, exclude } = {}) {
   const opt = { asOf, lookbackDays }
   const sleep = latestValue(days, 'sleepScore', opt), hrv = latestValue(days, 'hrv', opt), bb = latestValue(days, 'bodyBatteryHigh', opt)
   const readiness = latestValue(days, 'readiness', { asOf, lookbackDays: Math.min(1, lookbackDays) })
@@ -44,7 +49,7 @@ function recoveryModel(days, asOf, { sleepNeedHours = 8, lookbackDays = 2 } = {}
     parts.push({ key: 'sleep', text: `Sleep ${Math.round(sleep.value)} · ${b.label.toLowerCase()}`, tone: b.tone })
     if (dur && dur < need - 3600) parts.push({ key: 'short', text: `Short night · ${Math.floor(dur / 3600)}h ${String(Math.round(dur % 3600 / 60)).padStart(2, '0')}m`, tone: 'warning' })
   } else missing.push({ key: 'sleep', label: 'Sleep', reason: 'No sleep score for this night' })
-  const hr = hrvRatio(days, hrv)
+  const hr = hrvRatio(days, hrv, { exclude })
   if (hr) {
     // HRV near its own baseline is good; well below is a recovery signal. Above baseline is not
     // "extra" recovery, so it plateaus instead of pushing the score towards 100.
@@ -93,9 +98,9 @@ export function recoveryFor(days, asOf, opts) {
 const LABELS = { sleep: ['Sleep', 'sleep'], hrv: ['HRV', 'hrv'], bb: ['Body Battery', 'battery'] }
 
 /** Mean of the `n` days before `date` for a metric, needing at least 3 (null otherwise). */
-function priorMean(days, key, date) {
+function priorMean(days, key, date, exclude) {
   const prev = []
-  for (let i = 1; i <= 7; i += 1) prev.push(valueOf(key, days[addDays(date, -i)]))
+  for (let i = 1; i <= 7; i += 1) { const d = addDays(date, -i); if (!exclude?.has(d)) prev.push(valueOf(key, days[d])) }
   const have = prev.filter(v => v != null)
   return have.length >= 3 ? { base: mean(have), n: have.length } : null
 }
@@ -123,11 +128,12 @@ export function recoveryBreakdown(days, asOf, opts = {}) {
     const rhr = valueOf('restingHr', rec)
     if (rhr != null) {
       const g = rec?.heartRate?.resting7d
-      const own = g == null ? priorMean(days, 'restingHr', date) : null
-      if (g != null) context.push({ key: 'restingHr', label: 'Resting heart rate', value: rhr, base: g, delta: rhr - g, n: 7, source: 'garmin' })
+      const skipped = [1, 2, 3, 4, 5, 6, 7].some(i => opts.exclude?.has(addDays(date, -i)))
+      const own = g == null || skipped ? priorMean(days, 'restingHr', date, opts.exclude) : null
+      if (g != null && !(skipped && own)) context.push({ key: 'restingHr', label: 'Resting heart rate', value: rhr, base: g, delta: rhr - g, n: 7, source: 'garmin' })
       else if (own) context.push({ key: 'restingHr', label: 'Resting heart rate', value: rhr, base: own.base, delta: rhr - own.base, n: own.n, source: 'own' })
     }
-    const resp = valueOf('respiration', rec), rb = resp != null ? priorMean(days, 'respiration', date) : null
+    const resp = valueOf('respiration', rec), rb = resp != null ? priorMean(days, 'respiration', date, opts.exclude) : null
     if (rb) context.push({ key: 'respiration', label: 'Overnight respiration', value: resp, base: rb.base, delta: resp - rb.base, n: rb.n, source: 'own' })
   }
   let change = null
@@ -166,11 +172,11 @@ export function intensityWeek(days, asOf) {
 }
 
 /** Latest value minus the mean of the 7 days before it (null when fewer than 3 prior days). */
-export function deltaVs7(days, key, asOf) {
+export function deltaVs7(days, key, asOf, { exclude } = {}) {
   const last = latestValue(days, key, { asOf })
   if (!last) return null
   const prev = []
-  for (let i = 1; i <= 7; i += 1) prev.push(valueOf(key, days[addDays(last.date, -i)]))
+  for (let i = 1; i <= 7; i += 1) { const d = addDays(last.date, -i); if (!exclude?.has(d)) prev.push(valueOf(key, days[d])) }
   const have = prev.filter(v => v != null)
   if (have.length < 3) return null
   const delta = last.value - mean(have)

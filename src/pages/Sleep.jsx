@@ -5,7 +5,7 @@ import { toast } from '../components/toast'
 import TrendChart from '../charts/TrendChart'
 import { Legend, TipCard, refLabel } from '../charts/ChartParts'
 import { niceTicks, useChartTheme } from '../charts/chartTheme'
-import { useStore } from '../state/store'
+import { useExcluded, useStore } from '../state/store'
 import { SLEEP_NEED_OPTIONS, setPrefs, usePrefs } from '../lib/prefs'
 import { useRoute, setParams, href } from '../router'
 import { addDays, daysBetween, today } from '../lib/dates'
@@ -306,6 +306,7 @@ function BankCard({ coach }) {
 /* ---------- Page ---------- */
 export default function Sleep() {
   const days = useStore(s => s.days), prefs = usePrefs(), route = useRoute()
+  const exclude = useExcluded()
   const bounds = useMemo(() => dataBounds(days), [days])
   const latest = useMemo(() => latestValue(days, 'sleepDuration', { lookbackDays: 400 }), [days])
   const hasAny = !!latest
@@ -325,7 +326,7 @@ export default function Sleep() {
   const rec7 = useMemo(() => recoveryPairs(rows), [rows])
   const avg = useMemo(() => averages(rows), [rows])
   const tally = useMemo(() => subScoreTally(days, rows.map(r => r.date)), [days, rows])
-  const scoreSeries = useMemo(() => rollingBaseline(rows.map(r => ({ date: r.date, value: r.score })), 7), [rows])
+  const scoreSeries = useMemo(() => rollingBaseline(rows.map(r => ({ date: r.date, value: r.score })), 7, exclude), [rows, exclude])
   const scoreSummary = useMemo(() => summarize(rows.map(r => ({ value: r.score })), prevRows.map(r => ({ value: r.score }))), [rows, prevRows])
   const needNow = needSecFor(days[end]?.sleep, prefs.sleepNeedHours)
   const coach = useMemo(() => sleepCoach(days, { prefHours: prefs.sleepNeedHours, wakeClock: prefs.wakeTime }), [days, prefs.sleepNeedHours, prefs.wakeTime])

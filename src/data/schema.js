@@ -91,6 +91,7 @@ export const SCHEMA_VERSION = 1
  * @typedef {Object} JournalEntry  User-entered, stored in the `journal` store, never synced. An empty `tags` list means "checked in, nothing to tag".
  * @property {string} date       local YYYY-MM-DD the tags belong to
  * @property {string[]} tags
+ * @property {'sick'|'injured'|'travelling'|'break'} [status]  day status; this day and the day after are left out of baselines
  * @property {number} updatedAt  epoch ms of the last edit
  *
  * @typedef {Object} Profile

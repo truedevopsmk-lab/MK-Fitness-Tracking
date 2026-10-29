@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { CartesianGrid, ReferenceArea, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts'
-import { useStore } from '../../state/store'
+import { useExcluded, useStore } from '../../state/store'
 import { EFFORT_HARD, MIN_PAIRED, REC_HOLD, WINDOW, bounceText, changeText, resilienceFor, resilienceSeries, stateInfo } from '../../lib/resilience'
 import { effortPoints } from '../../lib/effort'
 import { usePrefs } from '../../lib/prefs'
@@ -88,16 +88,16 @@ function Fortnight({ r }) {
 }
 
 export default function Resilience() {
-  const days = useStore(s => s.days), acts = useStore(s => s.activities), { sleepNeedHours } = usePrefs()
+  const days = useStore(s => s.days), acts = useStore(s => s.activities), { sleepNeedHours } = usePrefs(), exclude = useExcluded()
   const [range, setRange] = useRange(60)
   const { from, to } = useMemo(() => rangeBounds(range), [range])
   const all = useMemo(() => Object.values(effortPoints(days, acts)).some(p => p.points != null), [days, acts])
   const d = useMemo(() => {
-    const rows = resilienceSeries(days, acts, from, to, { sleepNeedHours })
+    const rows = resilienceSeries(days, acts, from, to, { sleepNeedHours, exclude })
     const scored = rows.filter(x => x.state), last = rows[rows.length - 1]
     return { rows, scored, last, stretched: scored.filter(x => x.state === 'stretched').length, missing: rows.length - scored.length }
-  }, [days, acts, from, to, sleepNeedHours])
-  const now = useMemo(() => resilienceFor(days, acts, today(), { sleepNeedHours }), [days, acts, sleepNeedHours])
+  }, [days, acts, from, to, sleepNeedHours, exclude])
+  const now = useMemo(() => resilienceFor(days, acts, today(), { sleepNeedHours, exclude }), [days, acts, sleepNeedHours, exclude])
   const info = stateInfo(d.last?.state), change = signed(r0(now.change))
   const csv = () => ({ filename: `mk-fitness-resilience-${from}-${to}.csv`, rows: d.rows.map(x => ({ ...x, state: x.state || '' })), columns: [{ key: 'date', label: 'date' }, { key: 'recovery', label: 'recovery14' }, { key: 'effort', label: 'effort14' }, { key: 'n', label: 'scoredDays' }, { key: 'state', label: 'state' }] })
   return <ReportLayout title="Resilience" icon="scale" hue="readiness" subtitle="Whether recovery is keeping up with your effort" ranges={[30, 60, 120, 365]} range={range} onRange={setRange} hasData={all} csv={csv}
@@ -117,6 +117,6 @@ export default function Resilience() {
         { key: 'date', label: 'Date', format: v => fmtDay(v) }, { key: 'recovery', label: 'Recovery', align: 'right', format: cell }, { key: 'effort', label: 'Effort', align: 'right', format: cell },
         { key: 'state', label: 'Balance', align: 'right', format: v => stateInfo(v)?.short || '—' }]} /></div>
     </Card>
-    <HowToRead>Each day has a recovery estimate and an effort score. Averaging both over the last 14 days places the fortnight in one of four states, split at recovery {REC_HOLD} and effort {EFFORT_HARD} (a usual day for you): Strong, Fresh, Stretched or Low recovery. A window needs {MIN_PAIRED} days with both scores before it shows a state. The after-hard-days line needs 3 hard days and 3 other days in the last 28. This is a trend in your own data, not a diagnosis.</HowToRead>
+    <HowToRead>Each day has a recovery estimate and an effort score. Averaging both over the last 14 days places the fortnight in one of four states, split at recovery {REC_HOLD} and effort {EFFORT_HARD} (a usual day for you): Strong, Fresh, Stretched or Low recovery. A window needs {MIN_PAIRED} days with both scores before it shows a state. The after-hard-days line needs 3 hard days and 3 other days in the last 28. This is a trend in your own data, not a diagnosis. Days you mark sick, injured, travelling or on a break in the Journal are left out of the baselines behind your effort and recovery scores, but still count in the 14-day averages.</HowToRead>
   </ReportLayout>
 }

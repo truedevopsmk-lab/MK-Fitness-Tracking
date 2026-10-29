@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useStore } from '../state/store'
+import { useExcluded, useStore } from '../state/store'
 import { computeInsights, DETECTORS_INFO } from '../lib/insights'
 import { dataBounds } from '../data/select'
 import { daysBetween, today } from '../lib/dates'
@@ -35,7 +35,8 @@ function InsightCard({ insight }) {
 export default function Insights() {
   const days = useStore(s => s.days)
   const activities = useStore(s => s.activities)
-  const list = useMemo(() => computeInsights(days, activities), [days, activities])
+  const exclude = useExcluded()
+  const list = useMemo(() => computeInsights(days, activities, { exclude }), [days, activities, exclude])
   const bounds = useMemo(() => dataBounds(days), [days])
   const span = bounds ? daysBetween(bounds.first, today()) + 1 : 0
   const enough = span >= 14
@@ -58,7 +59,7 @@ export default function Insights() {
       <SectionTitle>How this works</SectionTitle>
       <details className="insights-info">
         <summary>What we look at</summary>
-        <p className="insights-info-intro">Each check stays silent unless there is enough data and the difference is big enough to matter. These describe what happened in your data, not why.</p>
+        <p className="insights-info-intro">Each check stays silent unless there is enough data and the difference is big enough to matter. These describe what happened in your data, not why. Days you mark sick, injured, travelling or on a break in the Journal, and the day after each, are left out.</p>
         <dl>
           {DETECTORS_INFO.map(d => <div key={d.id}><dt>{d.name}</dt><dd>{d.rule}</dd></div>)}
         </dl>

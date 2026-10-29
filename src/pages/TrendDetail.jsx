@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useStore } from '../state/store'
+import { useExcluded, useStore } from '../state/store'
 import { useRoute, navigate, href } from '../router'
 import { METRICS, deltaTone, isMeaningfulDelta } from '../lib/metrics'
 import { dataBounds } from '../data/select'
@@ -47,6 +47,7 @@ export default function TrendDetail({ metricKey }) {
   const m = METRICS[metricKey]
   const { params } = useRoute()
   const days = useStore(s => s.days)
+  const exclude = useExcluded()
   const todayKey = today()
   const { range, g, end } = resolveParams(params, todayKey)
   const [tableOpen, setTableOpen] = useState(false)
@@ -58,8 +59,8 @@ export default function TrendDetail({ metricKey }) {
   const summary = useMemo(() => summarize(series, prevSeries), [series, prevSeries])
   const buckets = useMemo(() => {
     const b = bucketSeries(series, g, m?.agg)
-    return g === 'day' && BASELINE_METRICS.includes(metricKey) ? rollingBaseline(b, 7) : b
-  }, [series, g, m, metricKey])
+    return g === 'day' && BASELINE_METRICS.includes(metricKey) ? rollingBaseline(b, 7, exclude) : b
+  }, [series, g, m, metricKey, exclude])
 
   if (!m) return <div className="page page-fade">
     <PageHeader title="Metric not found" back="#/trends" />
@@ -150,6 +151,7 @@ export default function TrendDetail({ metricKey }) {
         <div className="trend-foot">
           <MissingNote missing={summary.missing} total={summary.total} />
           {summary.missing > 0 && present > 0 && <span className="trend-foot-hint">Ticks under the chart mark days without data.</span>}
+          {g === 'day' && BASELINE_METRICS.includes(metricKey) && !band && series.some(p => exclude.has(p.date)) && <span className="trend-foot-hint">Status days from your Journal, and the day after each, are left out of the 7-day average.</span>}
         </div>
       </Card>
 

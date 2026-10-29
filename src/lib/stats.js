@@ -50,9 +50,9 @@ export function summarize(series, previous = []) {
   }
 }
 
-/** Trailing mean of the `n` days before index i (excluding i). */
-export function rollingBaseline(series, n = 7) {
-  return series.map((p, i) => ({ ...p, baseline: mean(series.slice(Math.max(0, i - n), i).map(x => x.value)) }))
+/** Trailing mean of the `n` days before index i (excluding i), skipping dates in `exclude`. */
+export function rollingBaseline(series, n = 7, exclude = null) {
+  return series.map((p, i) => ({ ...p, baseline: mean(series.slice(Math.max(0, i - n), i).filter(x => !exclude?.has(x.date)).map(x => x.value)) }))
 }
 
 /** Pearson correlation of paired values (pairs with a null on either side are dropped). */

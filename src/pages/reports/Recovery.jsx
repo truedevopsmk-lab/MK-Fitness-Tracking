@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useStore } from '../../state/store'
+import { useExcluded, useStore } from '../../state/store'
 import { dataBounds, metricSeries } from '../../data/select'
 import { summarize } from '../../lib/stats'
 import { recoveryBreakdown, recoverySeries } from '../../lib/homeLogic'
@@ -25,11 +25,12 @@ function leadSentence(b) {
 
 /** One day of the recovery score split into its inputs; ?date= picks the day (default = the Today hero). */
 function WhatMovedIt({ days, sleepNeedHours }) {
+  const exclude = useExcluded()
   const { params } = useRoute()
   const date = /^\d{4}-\d{2}-\d{2}$/.test(params.date || '') ? params.date : null
-  const def = useMemo(() => recoveryBreakdown(days, today(), { sleepNeedHours }), [days, sleepNeedHours])
+  const def = useMemo(() => recoveryBreakdown(days, today(), { sleepNeedHours, exclude }), [days, sleepNeedHours, exclude])
   const defaultDate = def.date ?? today()
-  const b = useMemo(() => date ? recoveryBreakdown(days, date, { sleepNeedHours, lookbackDays: 0 }) : def, [days, date, def, sleepNeedHours])
+  const b = useMemo(() => date ? recoveryBreakdown(days, date, { sleepNeedHours, lookbackDays: 0, exclude }) : def, [days, date, def, sleepNeedHours, exclude])
   const shownDate = date ?? defaultDate, garmin = b.kind === 'garmin'
   const sleepF = b.factors.find(f => f.key === 'sleep')
   const rows = [...b.factors.map(f => ({ f })), ...b.missing.map(m => ({ m }))]
@@ -79,11 +80,11 @@ function WhatMovedIt({ days, sleepNeedHours }) {
 }
 
 export default function Recovery() {
-  const days = useStore(s => s.days), { sleepNeedHours } = usePrefs()
+  const days = useStore(s => s.days), { sleepNeedHours } = usePrefs(), exclude = useExcluded()
   const [range, setRange] = useRange()
   const { from, to } = useMemo(() => rangeBounds(range), [range])
   const d = useMemo(() => {
-    const rec = recoverySeries(days, from, to, { sleepNeedHours }), sleep = metricSeries(days, 'sleepScore', from, to)
+    const rec = recoverySeries(days, from, to, { sleepNeedHours, exclude }), sleep = metricSeries(days, 'sleepScore', from, to)
     const hrv = metricSeries(days, 'hrv', from, to), bb = metricSeries(days, 'bodyBatteryHigh', from, to)
     // Same score as the Today hero: Garmin readiness when a day has it, else the recovery estimate
     const hasReadiness = rec.some(p => p.kind === 'garmin')
@@ -92,7 +93,7 @@ export default function Recovery() {
     const good = rows.filter(r => r.score != null && r.score >= 75).length, scored = rows.filter(r => r.score != null).length
     const low = rows.filter(r => r.score != null && r.score < 50).length
     return { rows, main, hasReadiness, good, scored, low, sum: summarize(main), ss: summarize(sleep), hs: summarize(hrv), bs: summarize(bb), all: Object.values(days).some(x => x.readiness?.score != null || x.sleep?.score != null || x.bodyBattery?.high != null) }
-  }, [days, from, to, sleepNeedHours])
+  }, [days, from, to, sleepNeedHours, exclude])
   const lastStatus = [...d.rows].reverse().find(r => r.status)?.status
   const hb = hrvStatusBand(lastStatus), band = METRICS.readiness.band(d.sum.avg == null ? null : Math.round(d.sum.avg))
   const csv = () => ({ filename: `recovery-${from}_${to}.csv`, rows: d.rows, columns: [{ key: 'date', label: 'Date' }, { key: 'score', label: d.hasReadiness ? 'Readiness' : 'Recovery estimate' }, { key: 'sleep', label: 'Sleep score' }, { key: 'hrv', label: 'HRV (ms)' }, { key: 'bb', label: 'Body Battery high' }] })
@@ -124,6 +125,6 @@ export default function Recovery() {
         { key: 'date', label: 'Day', format: v => fmtDay(v) }, { key: 'score', label: d.hasReadiness ? 'Readiness' : 'Estimate', align: 'right' },
         { key: 'sleep', label: 'Sleep', align: 'right' }, { key: 'hrv', label: 'HRV', align: 'right' }, { key: 'bb', label: 'BB high', align: 'right' }]} />
     </Card>
-    <HowToRead>{d.hasReadiness ? 'Training readiness is Garmin’s 0–100 guide to how ready you are for a hard session.' : 'We could not find a Garmin readiness score, so the top chart is our own estimate. The top card breaks one day into its inputs, each scored 0–100. HRV tops out at 85: HRV above your usual is not extra recovery.'} The charts below show the main ingredients. When sleep, HRV and Body Battery all dip together, take it as a nudge to go easier. When they climb together, you are absorbing training well.</HowToRead>
+    <HowToRead>{d.hasReadiness ? 'Training readiness is Garmin’s 0–100 guide to how ready you are for a hard session.' : 'We could not find a Garmin readiness score, so the top chart is our own estimate. The top card breaks one day into its inputs, each scored 0–100. HRV tops out at 85: HRV above your usual is not extra recovery.'} The charts below show the main ingredients. When sleep, HRV and Body Battery all dip together, take it as a nudge to go easier. When they climb together, you are absorbing training well. Days you mark sick, injured, travelling or on a break in the Journal, and the night after each, are left out of the HRV and resting heart rate baselines. If one falls in the last 7 nights, your own average of the other nights stands in for Garmin’s weekly one.</HowToRead>
   </ReportLayout>
 }

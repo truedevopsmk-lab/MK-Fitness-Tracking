@@ -17,3 +17,4 @@
 .jr-day[aria-current] .rp-li-main { color: var(--accent-text); }
 .jr-day svg { flex: none; color: var(--text-3); }
 .jr-note { font-size: 13.5px; color: var(--text-2); max-width: 70ch; margin: 16px 0 0; }
+.jr-hint { font-size: 13px; color: var(--text-2); margin: 8px 0 0; }

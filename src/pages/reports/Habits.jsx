@@ -94,7 +94,7 @@ export default function Habits() {
   })
   const { logged, tagged, ready, used, clearTags } = impact
   const summary = logged === 0 ? [] : [
-    { label: 'Logged', value: daysText(logged), sub: `of the last ${range}` },
+    { label: 'Logged', value: daysText(logged), sub: `of the last ${range}${impact.skipped ? ` · ${impact.skipped} left out` : ''}` },
     { label: 'With tags', value: daysText(tagged), sub: `${daysText(logged - tagged)} with nothing to tag` },
     { label: 'Compared', value: `${ready} of ${used}`, sub: `tags with ${MIN_EACH}+ days each way` },
     { label: 'Clear patterns', value: String(clearTags), sub: clearTags === 1 ? 'tag with a clear difference' : 'tags with a clear difference' },
@@ -104,6 +104,6 @@ export default function Habits() {
     emptyBody="Sync your Garmin data and tag your days in the Journal, and this report compares the nights after each tag."
     lead={<Standout impact={impact} top={top} range={range} />}>
     {impact.used > 0 && <ImpactCard impact={impact} outcome={outcome} />}
-    <HowToRead>A tag belongs to the day it happened, so each tagged day is paired with the night that followed: that night's sleep score and the next morning's recovery, HRV and resting heart rate. Those are compared with the same measures after logged days without the tag; days you didn't log are left out. A tag is compared once it has 5 logged days with it and 5 without. Differences smaller than normal night-to-night noise read as about the same, and "varies a lot" means the nights spread widely, so a few more days could change the average. Tags often go together (a late meal and a drink on the same evening), so a difference shows what tends to follow a tag, not what causes it. This is a trend in your own data, not medical advice.</HowToRead>
+    <HowToRead>A tag belongs to the day it happened, so each tagged day is paired with the night that followed: that night's sleep score and the next morning's recovery, HRV and resting heart rate. Those are compared with the same measures after logged days without the tag; days you didn't log are left out. Days with a day status (sick, injured, travelling or a break), and days whose following night was one, are left out. A tag is compared once it has 5 logged days with it and 5 without. Differences smaller than normal night-to-night noise read as about the same, and "varies a lot" means the nights spread widely, so a few more days could change the average. Tags often go together (a late meal and a drink on the same evening), so a difference shows what tends to follow a tag, not what causes it. This is a trend in your own data, not medical advice.</HowToRead>
   </ReportLayout>
 }

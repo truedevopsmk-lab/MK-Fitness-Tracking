@@ -45,6 +45,15 @@ const csv = daysToCsv(days).split('\r\n')
 assert.equal(csv.length, 3)
 assert.ok(csv[0].startsWith('date,sleepScore'))
 assert.ok(csv[1].startsWith('2026-10-01,82,27000'))
+// day status round-trips; an invalid one is dropped
+{
+  const sj = { ...journal, '2026-10-03': { date: '2026-10-03', tags: ['nap'], status: 'sick', updatedAt: 7 } }
+  const ex2 = buildExport({ ...state, journal: sj })
+  assert.equal(parseImport(JSON.stringify(ex2)).journal.find(e => e.date === '2026-10-03').status, 'sick')
+  const hand = JSON.parse(JSON.stringify(ex2)); hand.journal.find(e => e.date === '2026-10-03').status = 'bogus'
+  assert.ok(!('status' in parseImport(JSON.stringify(hand)).journal.find(e => e.date === '2026-10-03')))
+  assert.ok(!('status' in parseImport(JSON.stringify(ex)).journal[0]))
+}
 const acsv = activitiesToCsv(activities).split('\r\n')
 assert.ok(acsv[1].includes('"Run, easy"'))
 console.log('portable: ok')

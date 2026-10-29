@@ -17,6 +17,11 @@ export const TAGS = [
   { key: 'sauna', label: 'Sauna or hot bath', group: 'care' },
 ]
 
+export const STATUSES = [{ key: 'sick', label: 'Sick' }, { key: 'injured', label: 'Injured' }, { key: 'travelling', label: 'Travelling' }, { key: 'break', label: 'Break' }]
+const STATUS_BY_KEY = new Map(STATUSES.map(s => [s.key, s]))
+export const statusInfo = key => STATUS_BY_KEY.get(key) || null
+export const cleanStatus = v => STATUS_BY_KEY.has(v) ? v : null
+
 export const TAG_RE = /^[A-Za-z0-9_-]{1,40}$/
 export const CHECKIN_SWITCH_HOUR = 18
 const ORDER = new Map(TAGS.map((t, i) => [t.key, i]))
@@ -41,20 +46,27 @@ export function toggleTag(tags, key) {
 
 export const tagLabels = tags => cleanTags(tags).map(t => tagInfo(t).label)
 
-export const makeEntry = (date, patch = {}, prev = null, now = Date.now()) =>
-  ({ ...prev, ...patch, date, tags: cleanTags(patch.tags ?? prev?.tags ?? []), updatedAt: now })
+export const entryText = e => [statusInfo(e?.status)?.label, tagLabels(e?.tags || []).join(', ')].filter(Boolean).join(' · ')
+
+export function makeEntry(date, patch = {}, prev = null, now = Date.now()) {
+  const e = { ...prev, ...patch, date, tags: cleanTags(patch.tags ?? prev?.tags ?? []), updatedAt: now }
+  const status = cleanStatus(e.status)
+  if (status) e.status = status; else delete e.status
+  return e
+}
 
 const sameTags = (a, b) => a.length === b.length && a.every((t, i) => t === b[i])
 
-/** Merge incoming entries into { [date]: entry }. Newest edit with different tags wins; ties keep the local entry. */
+/** Merge incoming entries into { [date]: entry }. Newest edit with different tags or status wins; ties keep the local entry. */
 export function mergeJournal(current, list) {
   let journal = current
   const changed = []
   for (const raw of list || []) {
     if (!raw?.date) continue
-    const e = { ...raw, tags: cleanTags(raw.tags), updatedAt: Number.isFinite(raw.updatedAt) ? raw.updatedAt : 0 }
+    const { status: rawStatus, ...rest } = raw, status = cleanStatus(rawStatus)
+    const e = { ...rest, tags: cleanTags(raw.tags), updatedAt: Number.isFinite(raw.updatedAt) ? raw.updatedAt : 0, ...(status ? { status } : {}) }
     const cur = journal[e.date]
-    if (cur && !((e.updatedAt || 0) > (cur.updatedAt || 0) && !sameTags(e.tags, cleanTags(cur.tags)))) continue
+    if (cur && !((e.updatedAt || 0) > (cur.updatedAt || 0) && (!sameTags(e.tags, cleanTags(cur.tags)) || status !== cleanStatus(cur.status)))) continue
     if (journal === current) journal = { ...current }
     journal[e.date] = e
     changed.push(e)
@@ -82,3 +94,36 @@ export function journalStats(journal, asOf, n) {
 /** Newest first; entry is null for days that were not logged. */
 export const recentDays = (journal, asOf, n = 14) =>
   eachDay(addDays(asOf, -(n - 1)), asOf).reverse().map(date => ({ date, entry: journal[date] || null }))
+
+const excludedCache = new WeakMap()
+/**
+ * Dates left out of baselines: every status day and the day after it. A DayRecord holds the night ending
+ * that morning plus the daytime, so a status on D touches record D (daytime, often the onset night) and D+1 (the night after).
+ * Cached per journal object (the store replaces it immutably) so the Set identity is stable for useMemo deps.
+ */
+export function excludedDates(journal) {
+  if (!journal || typeof journal !== 'object') return new Set()
+  let set = excludedCache.get(journal)
+  if (!set) {
+    set = new Set()
+    for (const e of Object.values(journal)) if (e?.date && cleanStatus(e.status)) { set.add(e.date); set.add(addDays(e.date, 1)) }
+    excludedCache.set(journal, set)
+  }
+  return set
+}
+
+/** Journal entries with a status in [from, to]: { n, labels } (labels distinct, in STATUSES order). */
+export function statusSummary(journal, from, to) {
+  const found = new Set()
+  let n = 0
+  for (const d of eachDay(from, to)) { const s = cleanStatus(journal?.[d]?.status); if (s) { n++; found.add(s) } }
+  return { n, labels: STATUSES.filter(s => found.has(s.key)).map(s => s.label) }
+}
+
+/** Sentence for reports saying how many status days were left out of a baseline; null when none. */
+export function leftOutText({ n, labels }, period, what, after = 'night') {
+  if (!n) return null
+  const l = labels.join(', ')
+  return n === 1 ? `1 status day in the last ${period} days (${l}) and the ${after} after it are left out of your ${what}.`
+    : `${n} status days in the last ${period} days (${l}) and the ${after} after each are left out of your ${what}.`
+}

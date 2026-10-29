@@ -93,6 +93,29 @@ su = monitorSummary(healthMonitor(two, ASOF))
 assert.deepEqual(su, { tone: 'warning', title: '2 of 3 vitals outside your normal range', sub: 'Resting HR above · HRV below', sentence: '2 of 3 vitals outside your normal range: resting HR above and HRV below.' })
 assert.equal(monitorSummary({ total: 1, outside: 0, tone: 'good', vitals: [{ key: 'hrv', status: 'within' }] }).title, 'HRV within your normal range')
 
+// exclude: dropped nights do not count towards n
+{
+  const d = build(20, () => rhr(55), addDays(ASOF, -1))
+  const ex = new Set([addDays(ASOF, -1), addDays(ASOF, -2)])
+  assert.equal(normalRange(d, 'restingHr', ASOF, { exclude: ex }).n, 18)
+  assert.equal(normalRange(d, 'restingHr', ASOF).n, 20)
+  const wide = new Set(Array.from({ length: 10 }, (_, i) => addDays(ASOF, -1 - i)))
+  assert.equal(normalRange(d, 'restingHr', ASOF, { exclude: wide }).low, null)
+  // HRV: Garmin's range stands unless a status night is inside its window and our own range has 14 nights
+  const own = build(25, () => ({ hrv: { lastNight: 60 } }), addDays(ASOF, -1))
+  own[ASOF] = { date: ASOF, hrv: { lastNight: 50, baselineLow: 40, baselineHigh: 80 } }
+  const one = new Set([addDays(ASOF, -3)])
+  assert.equal(normalRange(own, 'hrv', ASOF, { exclude: one }).source, 'own')
+  assert.equal(normalRange(own, 'hrv', ASOF, { exclude: new Set(['2020-01-01']) }).source, 'garmin')
+  assert.equal(normalRange(own, 'hrv', ASOF, { exclude: new Set() }).source, 'garmin')
+  const thin = build(10, () => ({ hrv: { lastNight: 60 } }), addDays(ASOF, -1))
+  thin[ASOF] = own[ASOF]
+  assert.equal(normalRange(thin, 'hrv', ASOF, { exclude: one }).source, 'garmin')
+  assert.ok(healthSeries(d, 'restingHr', addDays(ASOF, -2), ASOF, { exclude: ex }).every(p => p.low != null))
+  const hm = healthMonitor({ ...d, [ASOF]: { date: ASOF, ...rhr(55) } }, ASOF, { exclude: ex })
+  assert.equal(hm.vitals.find(v => v.key === 'restingHr').range.n, 18)
+}
+
 // demo smoke test
 const demo = generateDemo(), dd = {}
 for (const d of demo.days) dd[d.date] = d

@@ -26,10 +26,10 @@ export function effortPoints(days, activities) {
 }
 
 /** Effort for one day: { date, score, points, load, stepPoints, steps, everydaySteps, workouts, usual, n, reason }. */
-export function effortFor(days, activities, asOf, pts = effortPoints(days, activities)) {
+export function effortFor(days, activities, asOf, pts = effortPoints(days, activities), { exclude } = {}) {
   const d = pts[asOf] || { points: null, load: null, stepPoints: null, steps: null, everydaySteps: null, workouts: 0 }
   const prior = []
-  for (let i = 1; i <= BASE_DAYS; i += 1) { const p = pts[addDays(asOf, -i)]?.points; if (p != null) prior.push(p) }
+  for (let i = 1; i <= BASE_DAYS; i += 1) { const day = addDays(asOf, -i); if (exclude?.has(day)) continue; const p = pts[day]?.points; if (p != null) prior.push(p) }
   const n = prior.length, mean = n ? prior.reduce((a, b) => a + b, 0) / n : null
   const base = { date: asOf, score: null, points: d.points, load: d.load, stepPoints: d.stepPoints, steps: d.steps, everydaySteps: d.everydaySteps, workouts: d.workouts, usual: mean == null ? null : Math.round(mean), n }
   if (d.points == null) return { ...base, reason: 'no-data' }
@@ -59,7 +59,7 @@ export const statusText = (status, isToday = true) => status ? (isToday ? TODAY 
 export function effortSeries(days, activities, from, to, opts = {}) {
   const pts = effortPoints(days, activities), rec = recoverySeries(days, from, to, opts)
   return eachDay(from, to).map((date, i) => {
-    const e = effortFor(days, activities, date, pts), recovery = rec[i].value, t = effortTarget(recovery)
+    const e = effortFor(days, activities, date, pts, { exclude: opts.exclude }), recovery = rec[i].value, t = effortTarget(recovery)
     return { date, value: e.score, points: e.points, load: e.load, stepPoints: e.stepPoints, steps: e.steps, usual: e.usual, recovery, lo: t ? t.lo : null, hi: t ? t.hi : null, status: effortStatus(e.score, t) }
   })
 }

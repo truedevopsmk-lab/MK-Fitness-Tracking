@@ -53,4 +53,14 @@ const s = effortSeries(sd, [], addDays(asOf, -2), asOf)
 assert.equal(s.length, 3)
 assert.equal(s[2].lo, 60); assert.equal(s[2].hi, 80); assert.equal(s[2].recovery, 80); assert.equal(s[2].status, 'in')
 assert.equal(s[1].lo, null); assert.equal(s[1].recovery, null)
+// status days are left out of the usual
+{
+  const hd = { ...history(28, 10000), [asOf]: steps(10000) }
+  const ex = new Set([addDays(asOf, -1), addDays(asOf, -2)])
+  hd[addDays(asOf, -1)] = steps(40000); hd[addDays(asOf, -2)] = steps(40000)
+  const a = effortFor(hd, [], asOf), b = effortFor(hd, [], asOf, undefined, { exclude: ex })
+  assert.equal(a.n, 28); assert.equal(b.n, 26); assert.equal(b.usual, 20); assert.ok(a.usual > b.usual)
+  assert.ok(b.score > a.score)
+  assert.equal(effortSeries(hd, [], asOf, asOf, { exclude: ex })[0].usual, 20)
+}
 console.log('effort tests passed')

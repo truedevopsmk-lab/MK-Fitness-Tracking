@@ -89,6 +89,15 @@ assert.ok(DETECTORS_INFO.length >= 10)
 // demo
 const demo = generateDemo()
 const out = computeInsights(demo.days.reduce((m, d) => (m[d.date] = d, m), {}), demo.activities)
+// status days are left out of every detector
+{
+  const rd = build(40, i => ({ heartRate: { resting: i < 7 ? 62 : 56 } }))
+  assert.ok(find(run(rd), 'rhr-trend'))
+  const ex = new Set(Array.from({ length: 4 }, (_, i) => addDays(ASOF, -i)))
+  assert.ok(!find(computeInsights(rd, [], { asOf: ASOF, exclude: ex }), 'rhr-trend'), 'recent days excluded -> silent')
+  assert.ok(find(computeInsights(rd, [], { asOf: ASOF, exclude: new Set() }), 'rhr-trend'))
+}
+
 console.log(`demo insights: ${out.length}`)
 out.forEach(x => console.log(` [${x.strength.toFixed(2)}] ${x.tone.padEnd(8)} ${x.title}\n        ${x.body}\n        ${x.evidence}`))
 assert.ok(out.length >= 2, 'demo yields insights')

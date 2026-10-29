@@ -217,5 +217,15 @@ export function generateDemoJournal(days, seed = 4242) {
     const tags = TAGS.filter(t => rand() < p[t.key]).map(t => t.key)
     out.push({ date, tags: cleanTags(tags), updatedAt: parseDay(addDays(date, 1)).getTime() + 9 * 3600e3 })
   }
-  return out
+  // fixed status spells, in days before `end`; added after the loop so the random draws above are unchanged
+  const byDay = new Map(out.map(e => [e.date, e]))
+  for (const [status, from, to] of [['sick', 9, 11], ['travelling', 54, 58], ['break', 93, 95]]) {
+    for (let k = from; k <= to; k += 1) {
+      const date = addDays(end, -k), e = byDay.get(date) || { date, tags: [], updatedAt: parseDay(addDays(date, 1)).getTime() + 9 * 3600e3 }
+      e.status = status
+      if (status === 'sick') e.tags = []
+      byDay.set(date, e)
+    }
+  }
+  return [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date))
 }

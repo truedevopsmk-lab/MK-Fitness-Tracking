@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useStore } from '../state/store'
+import { useExcluded, useStore } from '../state/store'
 import { lastNDays } from '../data/select'
 import { mean, sum } from '../lib/stats'
 import { fmtNumber } from '../lib/format'
@@ -40,7 +40,7 @@ const REPORTS = [
 ]
 
 function useCards() {
-  const days = useStore(s => s.days), acts = useStore(s => s.activities), journal = useStore(s => s.journal), { sleepNeedHours } = usePrefs()
+  const days = useStore(s => s.days), acts = useStore(s => s.activities), journal = useStore(s => s.journal), { sleepNeedHours } = usePrefs(), exclude = useExcluded()
   return useMemo(() => REPORTS.map(r => {
     let series = [], value = null, sub = r.label, vitals, emptyText, chips
     if (r.custom === 'day') {
@@ -52,22 +52,22 @@ function useCards() {
         series = x.hr.map(p => ({ date: p.ts, value: p.v }))
       } else emptyText = 'Needs detailed readings from a recent sync'
     } else if (r.custom === 'health') {
-      const m = healthMonitor(days, today())
+      const m = healthMonitor(days, today(), { exclude })
       value = m.total ? `${m.total - m.outside} of ${m.total}` : null; sub = 'vitals in your normal range'; vitals = m.vitals
       if (m.pending.some(x => x.reason === 'no-range')) emptyText = `Range builds after ${MIN_NIGHTS} nights`
     } else if (r.custom === 'res') {
-      const x = resilienceFor(days, acts, today(), { sleepNeedHours }), info = stateInfo(x.state)
+      const x = resilienceFor(days, acts, today(), { sleepNeedHours, exclude }), info = stateInfo(x.state)
       value = info ? info.short : null; sub = x.recovery == null ? '' : `recovery ${Math.round(x.recovery)} · effort ${Math.round(x.effort)}`
       if (x.reason === 'history') emptyText = `Builds after ${MIN_PAIRED} scored days`
-      series = resilienceSeries(days, acts, addDays(today(), -6), today(), { sleepNeedHours }).map(y => ({ date: y.date, value: y.recovery }))
+      series = resilienceSeries(days, acts, addDays(today(), -6), today(), { sleepNeedHours, exclude }).map(y => ({ date: y.date, value: y.recovery }))
     } else if (r.custom === 'habits') {
-      const x = habitImpact(days, journal, addDays(today(), -119), today(), { sleepNeedHours })
+      const x = habitImpact(days, journal, addDays(today(), -119), today(), { sleepNeedHours, exclude })
       if (x.ready) { value = String(x.clearTags); sub = `${x.clearTags === 1 ? 'tag stands' : 'tags stand'} out · last 120 days` }
       else emptyText = x.logged ? 'Compares a tag after 5 days with it and 5 without' : 'Tag your days in the Journal to compare'
       chips = findings(x, 3)
     } else if (r.key || r.custom === 'rec' || r.custom === 'effort') {
       const from = addDays(today(), -6)
-      series = r.key ? lastNDays(days, r.key, 7) : r.custom === 'effort' ? effortSeries(days, acts, from, today(), { sleepNeedHours }).map(x => ({ date: x.date, value: x.value })) : recoverySeries(days, from, today(), { sleepNeedHours })
+      series = r.key ? lastNDays(days, r.key, 7) : r.custom === 'effort' ? effortSeries(days, acts, from, today(), { sleepNeedHours, exclude }).map(x => ({ date: x.date, value: x.value })) : recoverySeries(days, from, today(), { sleepNeedHours, exclude })
       const avg = mean(series.map(p => p.value))
       value = avg == null ? null : `${fmtNumber(Math.round(avg))}${r.unit || ''}`
       const n = series.filter(p => p.value != null).length
@@ -84,7 +84,7 @@ function useCards() {
       }
     }
     return { ...r, series, value, sub, vitals, emptyText, chips }
-  }), [days, acts, journal, sleepNeedHours])
+  }), [days, acts, journal, sleepNeedHours, exclude])
 }
 
 export default function Reports() {

@@ -4,7 +4,7 @@ import '../styles/journal.css'
 import { actions, useStore } from '../state/store'
 import { addDays, toDay, today } from '../lib/dates'
 import { fmtClock, fmtDay } from '../lib/format'
-import { TAGS, TAG_GROUPS, checkinDay, journalStats, recentDays, tagInfo, tagLabels } from '../lib/journal'
+import { STATUSES, TAGS, TAG_GROUPS, checkinDay, entryText, journalStats, recentDays, statusInfo, tagInfo } from '../lib/journal'
 import { setParams, useRoute } from '../router'
 import { Button, Card, DateStepper, Icon, PageHeader, TagChips, dayLabel, toast } from '../components'
 
@@ -24,13 +24,14 @@ export default function Journal() {
   const unknown = tags.filter(t => tagInfo(t).group === 'other')
   const toggle = k => actions.toggleTag(shown, k)
   const savedAt = entry?.updatedAt ? (toDay(new Date(entry.updatedAt)) === asOf ? fmtClock(entry.updatedAt) : fmtDay(toDay(new Date(entry.updatedAt)))) : null
-  const status = !entry ? 'Not logged yet' : n ? `${n} ${n === 1 ? 'tag' : 'tags'}` : 'Checked in · nothing to tag'
+  const parts = [statusInfo(entry?.status)?.label, n ? `${n} ${n === 1 ? 'tag' : 'tags'}` : null].filter(Boolean)
+  const summary = !entry ? 'Not logged yet' : parts.length ? parts.join(' · ') : 'Checked in · nothing to tag'
 
   return <div className="page page-fade">
     <PageHeader title="Journal" subtitle="Tag your days. Your journal stays on this device." />
     <DateStepper date={shown} onChange={go} min={addDays(asOf, -365)} max={asOf} />
     <div className="jr-layout">
-      <Card title="Tags" subtitle={status} className="jr-tags">
+      <Card title="Tags" subtitle={summary} className="jr-tags">
         {TAG_GROUPS.map(g => <div key={g.key} className="jr-sec">
           <h3 className="jr-group">{g.label}</h3>
           <TagChips label={g.label} options={TAGS.filter(t => t.group === g.key)} selected={tags} onToggle={toggle} />
@@ -39,6 +40,11 @@ export default function Journal() {
           <h3 className="jr-group">Other</h3>
           <TagChips label="Other" options={unknown.map(k => ({ key: k, label: tagInfo(k).label }))} selected={tags} onToggle={toggle} />
         </div>}
+        <div className="jr-sec">
+          <h3 className="jr-group">Day status</h3>
+          <TagChips label={`Day status for ${shown}`} options={STATUSES} selected={entry?.status ? [entry.status] : []} onToggle={k => actions.setStatus(shown, entry?.status === k ? null : k)} />
+          <p className="jr-hint">Left out of your baselines, along with the night after.</p>
+        </div>
         <div className="jr-foot jr-foot-rule">
           {entry
             ? <><span className="jr-status">{savedAt ? `Saved ${savedAt}` : 'Saved'}</span>
@@ -50,7 +56,7 @@ export default function Journal() {
         <ul className="rp-list">
           {recent.map(({ date: d, entry: e }) => <li key={d}>
             <a className="jr-day" href={`#/journal?date=${d}`} aria-current={d === shown ? 'date' : undefined} onClick={ev => { ev.preventDefault(); go(d) }}>
-              <span className="rp-li-main">{dayLabel(d)}<small>{!e ? 'Not logged' : e.tags.length ? tagLabels(e.tags).join(', ') : 'Nothing tagged'}</small></span>
+              <span className="rp-li-main">{dayLabel(d)}<small>{!e ? 'Not logged' : entryText(e) || 'Nothing tagged'}</small></span>
               <Icon name="chevron-right" size={18} />
             </a>
           </li>)}

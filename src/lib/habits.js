@@ -2,7 +2,7 @@
 import { addDays, eachDay } from './dates.js'
 import { METRICS, deltaTone, isMeaningfulDelta, valueOf } from './metrics.js'
 import { mean, stdev } from './stats.js'
-import { cleanTags, tagInfo } from './journal.js'
+import { cleanTags, excludedDates, tagInfo } from './journal.js'
 import { recoveryFor } from './homeLogic.js'
 
 export const MIN_EACH = 5
@@ -16,10 +16,10 @@ export const OUTCOMES = [
 const num = v => typeof v === 'number' && Number.isFinite(v) ? v : null
 
 /** The night after `date` (sleep belongs to the day you woke up): { recovery, sleepScore, hrv, restingHr }, each a number or null. */
-export function nightAfter(days, date, { sleepNeedHours = 8 } = {}) {
+export function nightAfter(days, date, { sleepNeedHours = 8, exclude } = {}) {
   const next = addDays(date, 1)
   return {
-    recovery: num(recoveryFor(days, next, { sleepNeedHours, lookbackDays: 0 }).score),
+    recovery: num(recoveryFor(days, next, { sleepNeedHours, lookbackDays: 0, exclude }).score),
     sleepScore: valueOf('sleepScore', days[next]), hrv: valueOf('hrv', days[next]), restingHr: valueOf('restingHr', days[next]),
   }
 }
@@ -43,8 +43,11 @@ function compare(o, w, wo, min) {
 }
 
 /** Per tag and outcome: the night after tagged days against the night after logged days without the tag. */
-export function habitImpact(days, journal, from, to, { sleepNeedHours = 8, min = MIN_EACH } = {}) {
-  const entries = eachDay(from, to).filter(d => journal[d]).map(date => ({ date, tags: cleanTags(journal[date].tags), night: nightAfter(days, date, { sleepNeedHours }) }))
+export function habitImpact(days, journal, from, to, { sleepNeedHours = 8, min = MIN_EACH, exclude = excludedDates(journal) } = {}) {
+  const logged = eachDay(from, to).filter(d => journal[d])
+  // a logged day whose following night is excluded (the status day itself, or the day before one) says nothing about the tag
+  const kept = logged.filter(d => !exclude.has(addDays(d, 1)))
+  const entries = kept.map(date => ({ date, tags: cleanTags(journal[date].tags), night: nightAfter(days, date, { sleepNeedHours, exclude }) }))
   const used = cleanTags([...new Set(entries.flatMap(e => e.tags))])
   const tags = used.map(key => {
     const withTag = entries.filter(e => e.tags.includes(key)), without = entries.filter(e => !e.tags.includes(key))
@@ -57,7 +60,7 @@ export function habitImpact(days, journal, from, to, { sleepNeedHours = 8, min =
   })
   const has = (t, f) => OUTCOMES.some(o => f(t.outcomes[o.key]))
   return {
-    from, to, logged: entries.length, tagged: entries.filter(e => e.tags.length).length, used: tags.length,
+    from, to, logged: entries.length, skipped: logged.length - kept.length, tagged: entries.filter(e => e.tags.length).length, used: tags.length,
     ready: tags.filter(t => has(t, c => c.status !== 'needs-more')).length,
     clearTags: tags.filter(t => has(t, c => c.clear)).length,
     tags,

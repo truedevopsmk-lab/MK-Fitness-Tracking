@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import '../styles/home.css'
-import { getState, useStore } from '../state/store'
+import { getState, useExcluded, useStore } from '../state/store'
 import { today, daysBetween } from '../lib/dates'
 import { fmtDay, fmtDuration, fmtNumber } from '../lib/format'
 import { METRICS, hrvStatusBand, isMeaningfulDelta } from '../lib/metrics'
@@ -12,7 +12,7 @@ import { MIN_DAYS, effortFor, effortStatus, effortTarget, statusText } from '../
 import { healthMonitor, monitorSummary } from '../lib/health'
 import { bankText, clockFromNorm, sleepCoach } from './sleepLogic'
 import { bodyBatteryNow, deltaVs7, greetingFor, headlineFor, intensityWeek, latestActivity, recoveryFor, weekGrid, whenLabel } from '../lib/homeLogic'
-import { checkinDay, journalStats, tagLabels } from '../lib/journal'
+import { checkinDay, entryText, journalStats } from '../lib/journal'
 import { Badge, Button, Card, Empty, Icon, InstallHint, Meter, PageHeader, Ring, SectionTitle, StatTile, toast } from '../components'
 
 const trend = key => `#/trends/${key}`
@@ -35,10 +35,11 @@ function useSyncToast() {
 }
 
 function Tile({ metricKey, asOf, overnight, sub, label, href, mapValue, band, deltaKey = metricKey, days, spark }) {
+  const exclude = useExcluded()
   const last = latestValue(days, metricKey, { asOf })
   if (!last) return <StatTile metricKey={metricKey} value={null} label={label} href={href || trend(metricKey)} sub="No data yet" />
   const value = mapValue ? mapValue(last) : last.value
-  const dv = deltaVs7(days, deltaKey, asOf)
+  const dv = deltaVs7(days, deltaKey, asOf, { exclude })
   const when = last.ageDays > (0) ? whenLabel(last.date, asOf, overnight) : overnight ? 'Last night' : null
   const text = [typeof sub === 'function' ? sub(last) : sub, when].filter(Boolean).join(' · ')
   return <StatTile metricKey={metricKey} label={label} value={value} band={band ? band(last, value) : undefined} href={href || trend(metricKey)}
@@ -96,7 +97,7 @@ function JournalRow({ journal, asOf }) {
   return <a className="home-act home-journal" href="#/journal">
     <span className="home-act-ico"><Icon name="tag" size={22} /></span>
     <span className="home-act-text"><span className="home-act-label">Journal</span>
-      <span className="home-act-name">{!entry ? `Check in for ${when}` : entry.tags.length ? tagLabels(entry.tags).join(', ') : `Nothing tagged ${when}`}</span>
+      <span className="home-act-name">{!entry ? `Check in for ${when}` : entryText(entry) || `Nothing tagged ${when}`}</span>
       <span className="home-act-sub">{!entry ? 'Alcohol, late meals, travel and more · stays on this device' : `Logged ${st.logged} of the last 7 days`}</span></span>
     <Icon name="chevron-right" size={18} />
   </a>
@@ -119,14 +120,15 @@ export default function Today() {
   const profile = useStore(s => s.profile)
   const journal = useStore(s => s.journal)
   const source = useStore(s => s.source)
+  const exclude = useExcluded()
   const asOf = today(), { sleepNeedHours, wakeTime } = usePrefs()
   useSyncToast()
   const has = Object.keys(days).length > 0 || activities.length > 0
-  const rec = useMemo(() => recoveryFor(days, asOf, { sleepNeedHours }), [days, asOf, sleepNeedHours])
-  const eff = useMemo(() => effortFor(days, activities, asOf), [days, activities, asOf])
+  const rec = useMemo(() => recoveryFor(days, asOf, { sleepNeedHours, exclude }), [days, asOf, sleepNeedHours, exclude])
+  const eff = useMemo(() => effortFor(days, activities, asOf, undefined, { exclude }), [days, activities, asOf, exclude])
   const target = effortTarget(rec.score)
-  const insights = useMemo(() => { try { return computeInsights(days, activities, { asOf }).slice(0, 2) } catch { return [] } }, [days, activities, asOf])
-  const vitals = useMemo(() => { const m = healthMonitor(days, asOf); return { m, s: monitorSummary(m) } }, [days, asOf])
+  const insights = useMemo(() => { try { return computeInsights(days, activities, { asOf, exclude }).slice(0, 2) } catch { return [] } }, [days, activities, asOf, exclude])
+  const vitals = useMemo(() => { const m = healthMonitor(days, asOf, { exclude }); return { m, s: monitorSummary(m) } }, [days, asOf, exclude])
   const coach = useMemo(() => sleepCoach(days, { prefHours: sleepNeedHours, wakeClock: wakeTime }), [days, asOf, sleepNeedHours, wakeTime])
   const wk = useMemo(() => intensityWeek(days, asOf), [days, asOf])
   const act = useMemo(() => latestActivity(activities), [activities])
@@ -144,7 +146,7 @@ export default function Today() {
   const stepGoal = steps ? (steps.record.steps?.goal || profile?.stepGoal || 10000) : (profile?.stepGoal || 10000)
   const hrvLast = latestValue(days, 'hrv', { asOf })
   const hrvStatus = hrvStatusBand(hrvLast?.record.hrv?.status)
-  const hrvWeekly = hrvLast ? (hrvLast.record.hrv?.weeklyAvg ?? deltaVs7(days, 'hrv', asOf)?.avg) : null
+  const hrvWeekly = hrvLast ? (hrvLast.record.hrv?.weeklyAvg ?? deltaVs7(days, 'hrv', asOf, { exclude })?.avg) : null
   const hrvWhen = hrvLast && hrvLast.ageDays > 0 ? whenLabel(hrvLast.date, asOf, true) : 'Last night'
   const recWhen = rec.date && rec.date !== asOf ? whenLabel(rec.date, asOf, true) : null
   const bbRec = bbLast?.record.bodyBattery

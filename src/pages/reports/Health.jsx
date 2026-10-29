@@ -1,12 +1,13 @@
 import { useMemo } from 'react'
-import { useStore } from '../../state/store'
+import { useExcluded, useStore } from '../../state/store'
 import { MIN_NIGHTS, PRECISION, VITALS, fmtRange, healthMonitor, healthSeries, monitorSummary } from '../../lib/health'
 import { whenLabel } from '../../lib/homeLogic'
 import { METRICS, valueOf } from '../../lib/metrics'
 import { fmtDay, fmtNumber } from '../../lib/format'
-import { today } from '../../lib/dates'
+import { addDays, today } from '../../lib/dates'
+import { leftOutText, statusSummary } from '../../lib/journal'
 import { Badge, Card, Icon } from '../../components'
-import ReportLayout, { HowToRead, MiniTrend, TableView, rangeBounds, useRange } from './ReportLayout'
+import ReportLayout, { HowToRead, MiniTrend, ReportNote, TableView, rangeBounds, useRange } from './ReportLayout'
 
 const NAME = { restingHr: 'Resting HR', hrv: 'HRV', respiration: 'Breathing', spo2: 'SpO₂' }
 const unitOf = k => METRICS[k].unit === '%' ? '%' : ` ${METRICS[k].unit}`
@@ -28,8 +29,9 @@ function RangeBar({ vitalKey, value, low, high }) {
 }
 
 function VitalsCard({ days }) {
-  const asOf = today()
-  const m = useMemo(() => healthMonitor(days, asOf), [days, asOf])
+  const asOf = today(), exclude = useExcluded(), journal = useStore(s => s.journal)
+  const m = useMemo(() => healthMonitor(days, asOf, { exclude }), [days, asOf, exclude])
+  const leftOut = leftOutText(statusSummary(journal, addDays(asOf, -30), asOf), 30, 'normal ranges')
   const s = monitorSummary(m)
   const out = m.vitals.filter(v => v.status !== 'within')
   const icon = s?.tone === 'good' ? 'check' : s?.tone === 'warning' ? 'alert' : 'minus'
@@ -53,19 +55,20 @@ function VitalsCard({ days }) {
         <div className="hm-vital-foot"><span>{p.reason === 'no-value' ? 'No reading in the last 3 days' : `Range builds after ${MIN_NIGHTS} nights · ${p.n} so far`}</span></div>
       </li>)}
     </ul>
+    {leftOut && <ReportNote>{leftOut}</ReportNote>}
     <p className="rb-foot">Normal range = your average ± one standard deviation, so about two nights in three fall inside it.</p>
   </Card>
 }
 
 export default function Health() {
-  const days = useStore(s => s.days)
+  const days = useStore(s => s.days), exclude = useExcluded()
   const [range, setRange] = useRange()
   const { from, to } = useMemo(() => rangeBounds(range), [range])
   const d = useMemo(() => {
     const keys = VITALS.filter(k => k !== 'spo2' || Object.values(days).some(r => valueOf('spo2', r) != null))
     const series = {}, counts = {}
     for (const k of keys) {
-      series[k] = healthSeries(days, k, from, to)
+      series[k] = healthSeries(days, k, from, to, { exclude })
       const s = series[k]
       counts[k] = { scored: s.filter(p => p.status).length, within: s.filter(p => p.status === 'within').length, above: s.filter(p => p.status === 'above').length, below: s.filter(p => p.status === 'below').length }
     }
@@ -84,7 +87,7 @@ export default function Health() {
     })
     const any = Object.values(days).some(r => VITALS.some(k => valueOf(k, r) != null))
     return { keys, series, counts, rows, any, empty: rows.filter(r => !r.any).length, scored: rows.filter(r => r.scored).length, allIn: rows.filter(r => r.allIn).length }
-  }, [days, from, to])
+  }, [days, from, to, exclude])
   const csv = () => ({
     filename: `health-${from}_${to}.csv`, rows: d.rows,
     columns: [{ key: 'date', label: 'Date' }, ...d.keys.flatMap(k => [
@@ -113,6 +116,6 @@ export default function Health() {
         ...d.keys.map(k => ({ key: k, label: NAME[k], align: 'right', format: v => v == null ? '—' : fmtNumber(v, PRECISION[k]) })),
         { key: 'outside', label: 'Outside range', format: v => v || '—' }]} />
     </Card>
-    <HowToRead>Your normal range is the middle of your own readings over the previous 30 nights, so it moves with you. One night outside it is common; several in a row is worth noticing. A range needs at least 14 nights of data. For HRV we use Garmin’s balanced range when your watch reports one. Blood oxygen appears here only if your watch records it overnight. These are trends, not a diagnosis.</HowToRead>
+    <HowToRead>Your normal range is the middle of your own readings over the previous 30 nights, so it moves with you. One night outside it is common; several in a row is worth noticing. A range needs at least 14 nights of data. For HRV we use Garmin’s balanced range when your watch reports one. Blood oxygen appears here only if your watch records it overnight. These are trends, not a diagnosis. Days you mark sick, injured, travelling or on a break in the Journal, and the night after each, are left out of the normal range. If one falls inside Garmin’s HRV range, the HRV range comes from your other nights instead (when there are 14).</HowToRead>
   </ReportLayout>
 }

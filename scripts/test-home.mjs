@@ -65,4 +65,25 @@ assert.equal(c.n, 3); assert.equal(c.base, 14); assert.equal(c.delta, 1); assert
 const cg = nd0(); cg['2026-10-23'] = day('2026-10-23', { sleep: { score: 60 }, hrv: { lastNight: 50, weeklyAvg: 60 }, bodyBattery: { high: 50 } })
 bd = recoveryBreakdown(cg, '2026-10-24'); const pv = recoveryFor(cg, '2026-10-23', { lookbackDays: 0 })
 assert.equal(bd.change.prevScore, pv.score); assert.equal(bd.change.delta, bd.score - pv.score); assert.equal(bd.change.prevDate, '2026-10-23')
+// status days: left out of baselines
+{
+  const h = {}
+  for (let i = 1; i <= 8; i += 1) { const d = `2026-10-${String(24 - i).padStart(2, '0')}`; h[d] = day(d, { hrv: { lastNight: 80 }, heartRate: { resting: 50 } }) }
+  h['2026-10-23'].hrv.lastNight = 60
+  h['2026-10-24'] = day('2026-10-24', { sleep: { score: 85 }, hrv: { lastNight: 66, weeklyAvg: 60 }, bodyBattery: { high: 80 }, heartRate: { resting: 52, resting7d: 55 } })
+  const ex = new Set(['2026-10-23'])
+  const plain = recoveryFor(h, '2026-10-24'), skip = recoveryFor(h, '2026-10-24', { exclude: ex })
+  assert.ok(skip.score < plain.score, `${skip.score} < ${plain.score}`)
+  assert.equal(recoveryFor(h, '2026-10-24', { exclude: new Set(['2020-01-01']) }).score, plain.score)
+  const c1 = recoveryBreakdown(h, '2026-10-24').context.find(x => x.key === 'restingHr')
+  assert.equal(c1.source, 'garmin')
+  const c2 = recoveryBreakdown(h, '2026-10-24', { exclude: ex }).context.find(x => x.key === 'restingHr')
+  assert.equal(c2.source, 'own'); assert.equal(c2.base, 50); assert.equal(c2.n, 6)
+  assert.equal(recoverySeries(h, '2026-10-24', '2026-10-24', { exclude: ex })[0].value, skip.score)
+  // deltaVs7 skips excluded dates
+  const dv = { '2026-10-24': day('2026-10-24', { heartRate: { resting: 60 } }) }
+  for (let i = 1; i <= 7; i += 1) { const d = `2026-10-${String(24 - i).padStart(2, '0')}`; dv[d] = day(d, { heartRate: { resting: i === 1 ? 80 : 50 } }) }
+  assert.equal(deltaVs7(dv, 'restingHr', '2026-10-24').avg, (80 + 6 * 50) / 7)
+  assert.equal(deltaVs7(dv, 'restingHr', '2026-10-24', { exclude: new Set(['2026-10-23']) }).avg, 50)
+}
 console.log('home tests passed')

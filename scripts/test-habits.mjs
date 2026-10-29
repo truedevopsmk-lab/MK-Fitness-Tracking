@@ -147,4 +147,23 @@ assert.equal(MIN_EACH, 5)
   assert.ok(x.tags.some(t => OUTCOMES.some(o => t.outcomes[o.key].status === 'needs-more')))
 }
 
+// status days and the day before one are left out
+{
+  const spec = [...rep(6, () => ({ tags: ['alcohol'], next: { score: 70 } })), ...rep(8, () => ({ tags: [], next: { score: 80 } }))]
+  const { days, journal, from, to } = build(spec)
+  const base = habitImpact(days, journal, from, to)
+  assert.equal(base.logged, 14); assert.equal(base.skipped, 0)
+  const sick = addDays(START, 2 * 7)
+  const j2 = { ...journal, [sick]: { ...journal[sick], status: 'sick' } }
+  const x = habitImpact(days, j2, from, to)
+  // the status day and the logged day before it? entries are 2 days apart, so only the status day itself goes (day before is unlogged)
+  assert.equal(x.skipped, 1); assert.equal(x.logged, 13)
+  // a logged day one day before a status day is skipped too
+  const j3 = { ...journal, [addDays(START, 1)]: { date: addDays(START, 1), tags: [], updatedAt: 0, status: 'break' } }
+  const y = habitImpact(days, j3, from, to)
+  assert.equal(y.skipped, 2); assert.equal(y.logged, 13) // START (day before) and the status day itself (logged, no following-night match)
+  // explicit exclude overrides the journal default
+  assert.equal(habitImpact(days, j2, from, to, { exclude: new Set() }).skipped, 0)
+}
+
 console.log('habits: ok')

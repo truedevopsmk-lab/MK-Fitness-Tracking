@@ -44,4 +44,11 @@ assert.equal(csv.toCsv([{ a: 'x,y', b: 'q"t' }], [{ key: 'a' }, { key: 'b', labe
 const mt = await import(`${root}/src/lib/metrics.js`)
 assert.equal(mt.METRICS.respiration.format(14.23), '14.2 br/min')
 assert.equal(mt.isMeaningfulDelta('respiration', 0.4), false); assert.equal(mt.isMeaningfulDelta('respiration', 0.5), true)
+// rollingBaseline skips excluded dates
+{
+  const ser = [['2026-10-01', 10], ['2026-10-02', 20], ['2026-10-03', 100], ['2026-10-04', 30]].map(([date, value]) => ({ date, value }))
+  assert.equal(s.rollingBaseline(ser, 7)[3].baseline, (10 + 20 + 100) / 3)
+  assert.equal(s.rollingBaseline(ser, 7, new Set(['2026-10-03']))[3].baseline, 15)
+  assert.equal(s.rollingBaseline(ser, 7, new Set(['2026-10-03'])).length, 4)
+}
 console.log('lib tests: all passed')

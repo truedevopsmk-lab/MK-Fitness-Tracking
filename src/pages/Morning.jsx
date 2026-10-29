@@ -2,14 +2,14 @@ import { useMemo } from 'react'
 import { useDisplayName, withName } from '../lib/name'
 import '../styles/home.css'
 import '../styles/journal.css'
-import { actions, useStore } from '../state/store'
+import { actions, useExcluded, useStore } from '../state/store'
 import { usePrefs } from '../lib/prefs'
 import { today } from '../lib/dates'
 import { fmtDuration } from '../lib/format'
 import { METRICS, SLEEP_STAGES, hrvStatusBand } from '../lib/metrics'
 import { latestValue } from '../data/select'
 import { bodyBatteryNow, deltaVs7, greetingFor, headlineFor, recommendationFor, recoveryFor, whenLabel } from '../lib/homeLogic'
-import { TAGS, checkinDay } from '../lib/journal'
+import { STATUSES, TAGS, checkinDay, statusInfo } from '../lib/journal'
 import { Badge, Button, Card, Empty, Icon, Ring, TagChips, dayLabel } from '../components'
 
 const hueStyle = h => ({ '--m-hue': `var(--hue-${h})` })
@@ -19,12 +19,15 @@ function CheckIn() {
   const day = checkinDay(), entry = journal[day], when = day === today() ? 'today' : 'yesterday'
   const tags = entry?.tags || [], n = tags.length
   const options = TAGS.filter(t => t.quick || tags.includes(t.key))
+  const parts = [statusInfo(entry?.status)?.label, n ? `${n} tag${n === 1 ? '' : 's'}` : null].filter(Boolean)
   return <Card className="morning-card jr-checkin" style={{ '--m-hue': 'var(--accent)' }}>
     <span className="morning-label"><i className="tile-dot" aria-hidden="true" />Check-in · {dayLabel(day)}</span>
     <h2 className="jr-q">Anything from {when}?</h2>
     <TagChips label={`Tags for ${when}`} options={options} selected={tags} onToggle={k => actions.toggleTag(day, k)} />
+    <h3 className="jr-group">Day status</h3>
+    <TagChips label={`Day status for ${when}`} options={STATUSES} selected={entry?.status ? [entry.status] : []} onToggle={k => actions.setStatus(day, entry?.status === k ? null : k)} />
     <div className="jr-foot jr-foot-rule">
-      <span className="jr-status">{!entry ? 'Stays on this device' : n ? `${n} tag${n === 1 ? '' : 's'} saved` : 'Checked in · nothing to tag'}</span>
+      <span className="jr-status">{!entry ? 'Stays on this device' : parts.length ? `${parts.join(' · ')} saved` : 'Checked in · nothing to tag'}</span>
       <span className="jr-actions">
         {!entry && <Button size="sm" variant="secondary" onClick={() => actions.setJournal(day, { tags: [] })}>Nothing to tag</Button>}
         <Button size="sm" variant="ghost" href={`#/journal?date=${day}`}>All tags</Button>
@@ -36,9 +39,10 @@ function CheckIn() {
 export default function Morning() {
   const days = useStore(s => s.days)
   const profile = useStore(s => s.profile)
+  const exclude = useExcluded()
   const name = useDisplayName()
   const asOf = today(), { sleepNeedHours } = usePrefs()
-  const rec = useMemo(() => recoveryFor(days, asOf, { sleepNeedHours }), [days, asOf, sleepNeedHours])
+  const rec = useMemo(() => recoveryFor(days, asOf, { sleepNeedHours, exclude }), [days, asOf, sleepNeedHours, exclude])
   if (!Object.keys(days).length) return <div className="page morning"><Card><Empty icon="sync" title="No data yet" body="Sync with Garmin to see your morning check." action={<Button variant="primary" href="#/sync" icon="sync">Open Sync Center</Button>} /></Card></div>
 
   const sleep = latestValue(days, 'sleepScore', { asOf }), bb = latestValue(days, 'bodyBatteryHigh', { asOf })
@@ -48,7 +52,7 @@ export default function Morning() {
   const total = stages.reduce((a, x) => a + x.sec, 0)
   const band = sleep ? METRICS.sleepScore.band(sleep.value) : null
   const hb = hrvStatusBand(hrv?.record.hrv?.status)
-  const rd = deltaVs7(days, 'restingHr', asOf)
+  const rd = deltaVs7(days, 'restingHr', asOf, { exclude })
   const bbNow = bb ? bodyBatteryNow(bb.record) : null
   const bbBand = bbNow != null ? METRICS.bodyBatteryHigh.band(bbNow) : null
 

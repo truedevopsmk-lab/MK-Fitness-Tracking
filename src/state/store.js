@@ -10,7 +10,7 @@
 // to IndexedDB before the returned promise resolves.
 import { useSyncExternalStore } from 'react'
 import * as db from '../data/db.js'
-import { makeEntry, mergeJournal, toggleTag as toggleTagPure } from '../lib/journal.js'
+import { excludedDates, makeEntry, mergeJournal, toggleTag as toggleTagPure } from '../lib/journal.js'
 import { mergeActivities, mergeDays, mergeSection } from '../data/merge.js'
 
 export const IDLE_SYNC = { running: false, mode: null, phase: '', done: 0, total: 0, current: null, startedAt: null, rateLimitedUntil: null, message: '' }
@@ -41,6 +41,9 @@ function set(patch) {
 export const getState = () => state
 const subscribe = fn => { listeners.add(fn); return () => listeners.delete(fn) }
 export function useStore(selector = s => s) { return useSyncExternalStore(subscribe, () => selector(state)) }
+
+/** Dates left out of baselines (status days and the day after); same Set while the journal is unchanged. */
+export const useExcluded = () => excludedDates(useStore(s => s.journal))
 
 export const isDemoRequested = () => new URLSearchParams(location.search).get('demo') === '1' || localStorage.getItem(SOURCE_KEY) === 'demo'
 
@@ -115,6 +118,7 @@ export const actions = {
   },
 
   toggleTag: (date, key) => actions.setJournal(date, { tags: toggleTagPure(state.journal[date]?.tags, key) }),
+  setStatus: (date, status) => actions.setJournal(date, { status }),
 
   /** Remove a day from the journal (back to "not logged"). */
   async clearJournalDay(date) {

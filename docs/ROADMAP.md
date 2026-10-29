@@ -32,7 +32,7 @@ by the user and kept on the device.
 - **Phase 2 · Journal** (Log; never leaves the device)
   - [x] B1 Daily tags (alcohol, late meal, caffeine, travel, …) with a quick morning check-in
   - [x] B2 Habit impact — ≥ 5 days with and ≥ 5 without before showing a difference, with sample sizes
-  - [ ] B3 Day status — sick / injured / travelling / break, excluded from baselines
+  - [x] B3 Day status — sick / injured / travelling / break, excluded from baselines
   - [ ] B4 Counters — water, caffeine, alcohol
 - **Phase 3 · Training**
   - [ ] C1 Fitness / fatigue / form (Have) · C2 Training status from it (Have) · C3 Intensity mix 80/20 (Have)
@@ -99,3 +99,4 @@ by the user and kept on the device.
 - B1 Daily tags: on-device journal of tags (alcohol, late meal, travel, …) in its own IndexedDB store; check-in
   card on Morning, Journal row on Today, `#/journal?date=`, included in JSON export/import (`22f769e`).
 - B2 Habit impact: `#/reports/habits` compares the night after each tag with logged days without it (5+ each way, sample sizes always shown, clear vs varies), "What stands out" lead, card on Reports, link from Journal (`fbf52bb`).
+- B3 Day status: Sick / Injured / Travelling / Break on Journal and Morning check-in; the day and the day after are left out of normal ranges, HRV/RHR baselines, usual effort, insights, habit impact and 7-day averages (`TBD`).

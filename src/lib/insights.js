@@ -274,11 +274,13 @@ function weekStandout(days, asOf) {
 /**
  * @param {Record<string, object>} days   store day map
  * @param {object[]} activities
- * @param {{ asOf?: string }} [opts]
+ * @param {{ asOf?: string, exclude?: Set<string> }} [opts]  exclude: dates (status days) left out of every detector
  * @returns {Insight[]} sorted by strength, strongest first
  */
 export function computeInsights(days, activities, opts = {}) {
-  const asOf = opts.asOf || today(), d = days || {}, acts = activities || []
+  const asOf = opts.asOf || today(), acts = activities || []
+  const all = days || {}, ex = opts.exclude
+  const d = ex?.size ? Object.fromEntries(Object.entries(all).filter(([k]) => !ex.has(k))) : all
   const detectors = [
     () => sleepBodyBattery(d, asOf), () => poorSleepStress(d, asOf), () => hrvBelowBaseline(d, asOf),
     () => stepsMonth(d, asOf), () => restingHrTrend(d, asOf), () => bedtimeConsistency(d, asOf),

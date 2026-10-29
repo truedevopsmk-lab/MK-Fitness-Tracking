@@ -1,15 +1,16 @@
 import { useMemo } from 'react'
-import { useStore } from '../../state/store'
+import { useExcluded, useStore } from '../../state/store'
 import { dataBounds } from '../../data/select'
 import { mean } from '../../lib/stats'
 import { MIN_DAYS, STEP_POINTS, effortFor, effortPoints, effortSeries, effortStatus, effortTarget, statusText } from '../../lib/effort'
 import { recoveryFor, recoverySeries } from '../../lib/homeLogic'
 import { usePrefs } from '../../lib/prefs'
 import { fmtDay, fmtNumber } from '../../lib/format'
-import { today } from '../../lib/dates'
+import { addDays, today } from '../../lib/dates'
+import { leftOutText, statusSummary } from '../../lib/journal'
 import { setParams, useRoute } from '../../router'
 import { Badge, Card, DateStepper, Ring } from '../../components'
-import ReportLayout, { HowToRead, MiniTrend, StackedColumns, TableView, rangeBounds, useRange } from './ReportLayout'
+import ReportLayout, { HowToRead, MiniTrend, ReportNote, StackedColumns, TableView, rangeBounds, useRange } from './ReportLayout'
 
 const r0 = v => v == null ? null : Math.round(v)
 
@@ -21,13 +22,15 @@ function leadFor(e, target, recScore, isToday) {
 
 /** One day of effort split into workouts and everyday steps; ?date= picks the day (default today). */
 function DayEffort({ days, acts, pts, sleepNeedHours }) {
+  const exclude = useExcluded(), journal = useStore(s => s.journal)
   const { params } = useRoute()
   const picked = /^\d{4}-\d{2}-\d{2}$/.test(params.date || '') ? params.date : null
   const date = picked ?? today(), isToday = date === today()
-  const e = useMemo(() => effortFor(days, acts, date, pts), [days, acts, date, pts])
-  const recScore = useMemo(() => isToday ? recoveryFor(days, date, { sleepNeedHours }).score : recoverySeries(days, date, date, { sleepNeedHours })[0].value, [days, date, isToday, sleepNeedHours])
+  const e = useMemo(() => effortFor(days, acts, date, pts, { exclude }), [days, acts, date, pts, exclude])
+  const recScore = useMemo(() => isToday ? recoveryFor(days, date, { sleepNeedHours, exclude }).score : recoverySeries(days, date, date, { sleepNeedHours, exclude })[0].value, [days, date, isToday, sleepNeedHours, exclude])
   const target = effortTarget(recScore)
   const scored = e.score != null
+  const leftOut = leftOutText(statusSummary(journal, addDays(date, -28), date), 28, 'usual effort', 'day')
   return <Card className="rb-card" title="Day breakdown">
     <DateStepper date={date} onChange={d => setParams({ date: d === today() ? null : d })} min={dataBounds(days)?.first} max={today()} />
     <div className="rb-head">
@@ -49,23 +52,24 @@ function DayEffort({ days, acts, pts, sleepNeedHours }) {
       {e.usual != null && <li><span className="rp-li-main">Your usual day<small>Average of the previous {e.n} days with data</small></span>
         <strong className="num">{e.usual} pts</strong></li>}
     </ul>}
+    {leftOut && <ReportNote>{leftOut}</ReportNote>}
     <p className="rb-foot">A usual day scores 50 and twice your usual about 75. Estimate from Garmin training load and steps. It is not a Garmin number.</p>
   </Card>
 }
 
 export default function Effort() {
-  const days = useStore(s => s.days), acts = useStore(s => s.activities), { sleepNeedHours } = usePrefs()
+  const days = useStore(s => s.days), acts = useStore(s => s.activities), { sleepNeedHours } = usePrefs(), exclude = useExcluded()
   const [range, setRange] = useRange()
   const { from, to } = useMemo(() => rangeBounds(range), [range])
   const pts = useMemo(() => effortPoints(days, acts), [days, acts])
   const all = useMemo(() => Object.values(pts).some(p => p.points != null), [pts])
   const d = useMemo(() => {
-    const rows = effortSeries(days, acts, from, to, { sleepNeedHours })
+    const rows = effortSeries(days, acts, from, to, { sleepNeedHours, exclude })
     const scored = rows.filter(r => r.value != null), avg = mean(scored.map(r => r.value))
     const both = scored.filter(r => r.lo != null)
     const top = scored.reduce((b, r) => !b || r.value > b.value ? r : b, null)
     return { rows, scored, avg, targetN: both.length, inN: both.filter(r => r.status === 'in').length, above: both.filter(r => r.status === 'above').length, top, missing: rows.length - scored.length }
-  }, [days, acts, from, to, sleepNeedHours])
+  }, [days, acts, from, to, sleepNeedHours, exclude])
   const csv = () => ({ filename: `effort-${from}_${to}.csv`, rows: d.rows, columns: [{ key: 'date', label: 'Date' }, { key: 'value', label: 'Effort' }, { key: 'lo', label: 'Target low' }, { key: 'hi', label: 'Target high' }, { key: 'load', label: 'Training load' }, { key: 'stepPoints', label: 'Step points' }, { key: 'steps', label: 'Steps' }, { key: 'recovery', label: 'Recovery' }] })
   const cell = v => v == null ? '—' : String(Math.round(v))
   return <ReportLayout title="Effort" icon="gauge" hue="intensity" subtitle="How much you did against what your recovery allowed" range={range} onRange={setRange} hasData={all} csv={csv}
@@ -91,6 +95,6 @@ export default function Effort() {
         { key: 'load', label: 'Load', align: 'right', format: cell }, { key: 'steps', label: 'Steps', align: 'right', format: v => v == null ? '—' : fmtNumber(v) },
         { key: 'recovery', label: 'Recovery', align: 'right', format: cell }]} />
     </Card>
-    <HowToRead>Effort is our estimate from your Garmin data, not a Garmin score. Each day adds the training load of your workouts to 2 points for every 1,000 steps you took outside them, then compares that with your average day over the previous 28 days: a usual day scores 50, twice your usual about 75, and the score never quite reaches 100. The target comes from that day’s recovery: 60–80 when recovery is 75 or more, 40–60 from 50 to 74, and 20–40 below 50. Effort needs 14 days of history before it shows.</HowToRead>
+    <HowToRead>Effort is our estimate from your Garmin data, not a Garmin score. Each day adds the training load of your workouts to 2 points for every 1,000 steps you took outside them, then compares that with your average day over the previous 28 days: a usual day scores 50, twice your usual about 75, and the score never quite reaches 100. The target comes from that day’s recovery: 60–80 when recovery is 75 or more, 40–60 from 50 to 74, and 20–40 below 50. Effort needs 14 days of history before it shows. Days you mark sick, injured, travelling or on a break in the Journal, and the day after each, are left out of your usual effort.</HowToRead>
   </ReportLayout>
 }
