@@ -2,10 +2,13 @@
 //   days        keyPath 'date'  → DayRecord
 //   activities  keyPath 'id'    → Activity
 //   journal     keyPath 'date'  → JournalEntry (user-entered tags, never synced)
+//   fitWorkouts keyPath 'id'    → FitWorkout (summary of an imported FIT file, see schema.js)
+//   fitSeries   keyPath 'id'    → FitSeries (the workout's samples; read one at a time)
+//   fitFiles    keyPath 'id'    → original FIT bytes keyed by SHA-256, kept so files can be re-read by a newer parser
 //   meta        out-of-line key → profile, syncMeta, endpoints, log, demoJournal
 //   data        legacy v1 store (raw Garmin payloads) — read once by migrate.js, then cleared
 
-const REAL_DB = 'garmin-personal-dashboard', DEMO_DB = 'mk-fitness-demo', VERSION = 3
+const REAL_DB = 'garmin-personal-dashboard', DEMO_DB = 'mk-fitness-demo', VERSION = 4
 
 let dbName = REAL_DB
 let handle = null
@@ -23,6 +26,7 @@ function open() {
       if (!db.objectStoreNames.contains('activities')) db.createObjectStore('activities', { keyPath: 'id' })
       if (!db.objectStoreNames.contains('journal')) db.createObjectStore('journal', { keyPath: 'date' })
       if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta')
+      for (const name of ['fitWorkouts', 'fitSeries', 'fitFiles']) if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' })
     }
     r.onsuccess = () => { r.result.onversionchange = () => { r.result.close(); handle = null }; resolve(r.result) }
     r.onerror = () => { handle = null; reject(r.error) }
@@ -34,6 +38,8 @@ const done = tx => new Promise((resolve, reject) => { tx.oncomplete = () => reso
 const request = r => new Promise((resolve, reject) => { r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error) })
 
 export async function getAll(store) { const db = await open(); return request(db.transaction(store).objectStore(store).getAll()) }
+export async function getOne(store, key) { const db = await open(); return request(db.transaction(store).objectStore(store).get(key)) }
+export async function getKeys(store) { const db = await open(); return request(db.transaction(store).objectStore(store).getAllKeys()) }
 export async function getMeta(key, fallback = null) { const db = await open(); return (await request(db.transaction('meta').objectStore('meta').get(key))) ?? fallback }
 export async function getLegacy(key) { const db = await open(); return request(db.transaction('data').objectStore('data').get(key)) }
 
@@ -41,6 +47,15 @@ export async function putMany(store, records) {
   if (!records.length) return
   const db = await open(), tx = db.transaction(store, 'readwrite'), os = tx.objectStore(store)
   records.forEach(r => os.put(r))
+  return done(tx)
+}
+
+/** Put records into several stores in one transaction: { store: records[] }. */
+export async function putAll(byStore) {
+  const names = Object.keys(byStore).filter(k => byStore[k]?.length)
+  if (!names.length) return
+  const db = await open(), tx = db.transaction(names, 'readwrite')
+  names.forEach(n => { const os = tx.objectStore(n); byStore[n].forEach(r => os.put(r)) })
   return done(tx)
 }
 
@@ -57,7 +72,7 @@ export async function setMeta(entries) {
   return done(tx)
 }
 
-export async function clearStores(stores = ['days', 'activities', 'journal', 'meta', 'data']) {
+export async function clearStores(stores = ['days', 'activities', 'journal', 'meta', 'data', 'fitWorkouts', 'fitSeries', 'fitFiles']) {
   const db = await open(), tx = db.transaction(stores, 'readwrite')
   stores.forEach(s => tx.objectStore(s).clear())
   return done(tx)

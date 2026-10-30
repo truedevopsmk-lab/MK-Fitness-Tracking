@@ -102,6 +102,36 @@ export const SCHEMA_VERSION = 1
  * @property {string|null} timeZone
  * @property {number|null} stepGoal
  * @property {number|null} sleepNeedSec
+ *
+ * @typedef {Object} FitWorkout  One session of an imported FIT file (data/fitNormalize.js), store `fitWorkouts`. Separate from synced Activities.
+ * @property {string} id               'fit-<watch serial>-<FIT start time>' (+ '-<n>' for multisport); the same workout re-exported gets the same id
+ * @property {'fit'} source
+ * @property {number} parser           FIT_PARSER_VERSION that wrote it
+ * @property {string|null} sha256      hash of the original file (store `fitFiles` key)
+ * @property {string|null} fileName    without folders or the account-export e-mail prefix
+ * @property {string|null} garminId    Garmin activity id parsed from the file name, when present
+ * @property {string} type             Garmin-style type key ('running', 'trail_running', …)
+ * @property {string} day              local day of the start, from the watch's UTC offset
+ * @property {number} startTs
+ * @property {number|null} elapsedSec  start to finish, pauses included
+ * @property {number|null} timerSec    timer running (pauses left out)
+ * @property {number|null} distanceM
+ * @property {number|null} avgHr       … and the rest of the session totals (speed, cadence in steps/min for running, TE, load, rpe, temperatures)
+ * @property {{fromTs:number,toTs:number,sec:number}[]} pauses
+ * @property {object[]} laps           per lap: timerSec, distanceM, avgSpeed, avgHr, maxHr, avgCadence, trigger
+ * @property {object[]} splits         the watch's run/walk/stand segments; `splitSummary` totals them per type
+ * @property {{secs:number[]|null,bounds:number[]|null,calc:string|null,maxHr:number|null}|null} zones  the watch's own time in 7 zone slots and its limits
+ * @property {{name:string|null,steps:object[]}|null} workout  planned workout and step targets (speed m/s or HR bpm)
+ * @property {{stopTs:number|null,hrAtStop:number|null,hrAfter:number,afterSec:number|null}[]} recovery  watch-recorded recovery HR after stops
+ * @property {string[]} sensors
+ * @property {object} counts           records, events, laps, splits, rrIntervals, devFields
+ * @property {object} derived          lib/fitAnalysis.js deriveWorkout(): efficiency, best efforts, shape, mix, drift, speed by zone
+ *
+ * @typedef {Object} FitSeries  The workout's samples, columnar, store `fitSeries` (same id). Arrays line up by sample; a channel never recorded is null, a missing sample is null.
+ * @property {string} id
+ * @property {number[]} t      seconds since start (elapsed)
+ * @property {number[]} tt     timer seconds (pauses left out) — use this for averages and charts
+ * @property {(number|null)[]|null} dist  speed  hr  cad  alt  lat  lon  temp  power  vo  gct  stepLen  resp
  */
 
 export {}

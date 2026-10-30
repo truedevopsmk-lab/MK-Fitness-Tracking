@@ -15,6 +15,7 @@ import { mergeActivities, mergeDays, mergeSection } from '../data/merge.js'
 
 export const IDLE_SYNC = { running: false, mode: null, phase: '', done: 0, total: 0, current: null, startedAt: null, rateLimitedUntil: null, message: '' }
 const SOURCE_KEY = 'mk_fitness_source'
+const sortFit = list => [...list].sort((a, b) => (b.startTs ?? 0) - (a.startTs ?? 0))
 const LOG_LIMIT = 200
 
 const initialState = {
@@ -24,6 +25,7 @@ const initialState = {
   activities: [],          // Activity[] newest first
   profile: null,           // Profile
   journal: {},             // { 'YYYY-MM-DD': JournalEntry } — entered by the user, never synced
+  fitWorkouts: [],         // FitWorkout[] newest first — imported FIT files (Workout lab); samples stay in IndexedDB
   syncMeta: { lastSuccessAt: null, lastAttemptAt: null, lastFullAt: null, lastResult: null, lastError: null, coverage: null },
   endpoints: {},           // { [endpointId]: EndpointStatus } — see docs/ARCHITECTURE.md
   sync: IDLE_SYNC,
@@ -63,8 +65,8 @@ export const actions = {
       const { migrateLegacy } = await import('../data/migrate.js')
       await migrateLegacy().catch(e => console.warn('legacy migration failed', e))
     }
-    let [dayList, activities, journalList, profile, syncMeta, endpoints, log] = await Promise.all([
-      db.getAll('days'), db.getAll('activities'), db.getAll('journal'), db.getMeta('profile'), db.getMeta('syncMeta'), db.getMeta('endpoints', {}), db.getMeta('log', []),
+    let [dayList, activities, journalList, profile, syncMeta, endpoints, log, fitWorkouts] = await Promise.all([
+      db.getAll('days'), db.getAll('activities'), db.getAll('journal'), db.getMeta('profile'), db.getMeta('syncMeta'), db.getMeta('endpoints', {}), db.getMeta('log', []), db.getAll('fitWorkouts').catch(() => []),
     ])
     if (demo && !dayList.length) {
       const { generateDemo } = await import('../data/demo.js')
@@ -82,7 +84,39 @@ export const actions = {
     activities.sort((a, b) => (b.startTs ?? 0) - (a.startTs ?? 0))
     // An interrupted sync (tab closed) must not look like it is still running.
     for (const ep of Object.values(endpoints || {})) if (ep.status === 'running' || ep.status === 'queued') ep.status = 'cancelled'
-    set({ ready: true, source: demo ? 'demo' : 'garmin', days, activities, journal: Object.fromEntries(journalList.map(e => [e.date, e])), profile: profile ?? null, syncMeta: { ...initialState.syncMeta, ...syncMeta }, endpoints: endpoints || {}, log: log || [] })
+    set({ ready: true, source: demo ? 'demo' : 'garmin', days, activities, journal: Object.fromEntries(journalList.map(e => [e.date, e])), fitWorkouts: sortFit(fitWorkouts), profile: profile ?? null, syncMeta: { ...initialState.syncMeta, ...syncMeta }, endpoints: endpoints || {}, log: log || [] })
+  },
+
+  /** Store an import batch from data/fitImport.js: summaries, samples and the original files, in one transaction. */
+  async addFitBatch({ workouts = [], series = [], files = [] }) {
+    await db.putAll({ fitWorkouts: workouts, fitSeries: series, fitFiles: files })
+    if (workouts.length) set(s => ({ fitWorkouts: sortFit([...s.fitWorkouts.filter(w => !workouts.some(x => x.id === w.id)), ...workouts]) }))
+  },
+
+  /** Samples for one imported workout (not kept in memory). */
+  getFitSeries: id => db.getOne('fitSeries', id),
+
+  /** File hashes and workout ids already stored, so an import can skip duplicates. */
+  async fitKnown() {
+    const hashes = await db.getKeys('fitFiles').catch(() => [])
+    return { hashes: new Set(hashes), ids: new Set(state.fitWorkouts.map(w => w.id)) }
+  },
+
+  /** Remove imported workouts (and their samples, and files no other workout uses). Synced Garmin data is untouched. */
+  async deleteFitWorkouts(ids) {
+    const gone = new Set(ids), left = state.fitWorkouts.filter(w => !gone.has(w.id))
+    const files = [...new Set(state.fitWorkouts.filter(w => gone.has(w.id)).map(w => w.sha256).filter(Boolean))].filter(h => !left.some(w => w.sha256 === h))
+    await Promise.all([db.deleteMany('fitWorkouts', ids), db.deleteMany('fitSeries', ids), db.deleteMany('fitFiles', files)])
+    set({ fitWorkouts: left })
+  },
+
+  /** Demo mode only: build FIT files from the demo runs and import them, so the Workout lab has something to show. */
+  async ensureDemoFit() {
+    if (state.source !== 'demo' || state.fitWorkouts.length || await db.getMeta('demoFit')) return
+    const [{ generateDemoFitFiles }, { importFit }] = await Promise.all([import('../data/demoFit.js'), import('../data/fitImport.js')])
+    const blobs = generateDemoFitFiles(state.activities).map(f => new File([f.bytes], f.name))
+    await importFit(blobs, { onBatch: actions.addFitBatch })
+    await db.setMeta({ demoFit: true })
   },
 
   /** Merge partial DayRecords keyed by date. Never deletes data. Returns number of days touched. */

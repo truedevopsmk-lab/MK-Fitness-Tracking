@@ -1,4 +1,4 @@
-# Handoff — state on 2026-10-29
+# Handoff — state on 2026-10-30
 
 Any AI tool picking this up: read `CLAUDE.md`, then `docs/ARCHITECTURE.md`, `docs/RECIPES.md` and `docs/DECISIONS.md`.
 Then read this file. It holds the next piece's full spec (§3) and the steps that close out every piece (§2).
@@ -15,9 +15,11 @@ Then read this file. It holds the next piece's full spec (§3) and the steps tha
   A5 Sleep sub-scores, A6 Resilience and A7 Day timeline.
 - Phase 2: B1 Daily tags, B2 Habit impact, B3 Day status and B4 Counters.
 - E1 Copy for AI (Sync Center), built at the owner's request.
+- F1 Workout lab (`#/lab`): FIT import and analysis, built at the owner's request. Follow-ups in §6.
 
 **Pending, in this order:**
 
+0. **Workout lab follow-ups F2–F7** (§6), if the owner wants more there first.
 1. **C1 Fitness / fatigue / form + C2 Training status + C3 Intensity mix 80/20.** Fully designed in §3; no code written yet.
 2. **C4 Personal records + C7 Race predictor.** Outline in §4.
 3. **C5 Splits + route map**, from the activity `details` endpoint. Needs a normaliser; outline in §4.
@@ -263,3 +265,42 @@ changing it. Optional, but it makes the demo look like a typical easy-heavy plan
 | D5 Compare periods | Two ranges side by side, reusing `rangeBounds` and `summarize`. |
 | D6 Correlation explorer | `correlation()` exists in `src/lib/stats.js`. Needs a minimum n and "follows, not causes" copy (like Habit impact). |
 | D8 Customise Today | Show/hide and order Today rows, stored in prefs. |
+
+## 6. Workout lab (F1 built) and what's left
+
+**What exists (2026-10-30).**
+
+- **Flow:** `src/data/zip.js` → `fit.js` (decoder) → `fitNormalize.js` → `fitImport.js` (dedupe, batches) → store actions
+  `addFitBatch` / `getFitSeries` / `fitKnown` / `deleteFitWorkouts` / `ensureDemoFit`.
+- **Storage:** IndexedDB v4 stores `fitWorkouts`, `fitSeries` and `fitFiles`. Shapes are in `schema.js` (FitWorkout,
+  FitSeries).
+- **Analysis:** `src/lib/fitAnalysis.js`. Pages are `pages/Lab.jsx` and `pages/LabWorkout.jsx`; styles are in
+  `styles/lab.css`.
+- **Tests:** `test-fit`, `test-fitencode`, `test-zip`, `test-fitanalysis`, `test-fitimport`. Thresholds are in
+  DECISIONS → "Workout lab".
+- **Validation:** checked against Garmin's SDK on the owner's 30 Oct run. Reproduce with `npm i @garmin/fitsdk` in a
+  scratch folder, **never in the repo**, because the licence bars redistribution. Expected values:
+  - 233 records, 3 laps (7:17, 6:26, 5:26 /km), timer 15:09 of 23:59 elapsed, 5 pauses (8:50)
+  - zones from the watch, limits 94/113/132/150/169/188 (% of max 188)
+  - recovery HR 158→140 and 174→130
+  - workout "Base" with a 7:09–8:42 /km target
+- **Personal data:** never commit the owner's FIT/zip files. Tests build synthetic FIT files with `fitEncode.js`, and
+  demo GPS is at 0.5°N 0.5°E.
+
+**Next pieces, in order.** Each closes out with the §2 steps.
+
+| # | Piece | Plan |
+|---|---|---|
+| F2 | Garmin download probe | Add probes to `src/sync/probe.js`: `/download-service/files/activity/{activityId}` (zip of the original FIT) and `/activity-service/activity/{id}/splits`. `request()` parses JSON, so add `requestBytes(path)` in `garmin.js` that returns `arrayBuffer()` and does the same error mapping. The probe keeps only status, content type and size. Run it on the owner's key and record the result in `GARMIN-API.md`. |
+| F3 | Auto-download after sync (only if F2 is 200) | Add an engine step after activities: for each synced activity with no FIT workout (`matchActivity`), fetch the zip (one at a time, 1 s gap, newest 30 first, the rest on full sync). Pass it to `importFit([new File([buf], id + '.zip')])`. Show its status in the Sync Center under "Original files". The Worker already forwards any path and body, so `worker/` stays unchanged. |
+| F4 | Settings + export | Settings → Data: a "Workout lab" row showing the count and storage used (sum of `fitFiles` sizes), with "Remove all imported workouts" (`deleteFitWorkouts`). JSON export keeps excluding FIT bytes (too big); say so in the export hint. Add "Copy for AI" support: include FIT-derived splits for workouts in range (`aiSummary.js` `workoutLine` + `kmSplits` per workout, capped at 10 workouts). |
+| F5 | Synced activity → lab link | In `ActivityDetail.jsx`, when `matchActivity` finds a FIT workout, show a "Second by second" card linking to `#/lab/:id`. Otherwise show a one-line hint on how to import the original. |
+| F6 | Account export at scale | Test with a real Garmin account export (≈1 GB, thousands of files). Measure import time on the iPhone. If over ~2 min, move `importFit` into a Web Worker (`new Worker(new URL('./fitWorker.js', import.meta.url), { type: 'module' })`, posting batches back). Keep `MAX_FIT_BYTES`. Check that the IndexedDB quota (`estimateUsage`) holds: about 50 KB per hour of running. |
+| F7 | More analysis | **Cycling:** speed charts already work; add power/cadence when present. **Strength:** `set` messages (num 225) give reps and weights. **HRV during workouts:** `hrv` messages (num 78) when beat-to-beat logging is on. **Heat:** adjust efficiency for `avgTempC` once 20+ runs span 10 °C. **Weekly running volume** chart from `fitWorkouts`. |
+
+**Known limits.**
+
+- Run shape is heuristic. "Intervals" needs 4+ fast stretches of 30 s or more.
+- The 30 Oct run reads "Progression" because each third was faster.
+- Efficiency mixes easy and hard runs, so the trend is what matters.
+- Best efforts use GPS distance, which can run 1–3% long on twisty routes.

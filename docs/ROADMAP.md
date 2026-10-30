@@ -37,7 +37,9 @@ by the user and kept on the device.
 - **Phase 3 · Training**
   - [ ] C1 Fitness / fatigue / form (Have) · C2 Training status from it (Have) · C3 Intensity mix 80/20 (Have)
   - [ ] C4 Personal records from synced activities (Have) · C7 Race predictor, computed locally (Have)
-  - [ ] C5 Splits + route map from the activity `details` endpoint (Have, needs a normaliser)
+  - [~] C5 Splits + route map — done for imported FIT files (Workout lab); still to do for synced activities via the `details` endpoint
+  - [x] F1 Workout lab: FIT import (zip / account export / watch files), per-workout analysis and across-runs insights (built 2026-10-30 at the owner's request)
+  - [ ] F2–F7 Workout lab follow-ups — see `HANDOFF.md` §6
   - [ ] C9 Gear mileage (Log; Garmin gear unknown until the next capability check)
   - Dropped unless Garmin opens them: C6 VO₂ max + fitness age, C8 Strength sets (404 on Personal keys)
 - **Phase 4 · Reviews**
@@ -103,3 +105,4 @@ by the user and kept on the device.
 - B3 Day status: Sick / Injured / Travelling / Break on Journal and Morning check-in; the day and the day after are left out of normal ranges, HRV/RHR baselines, usual effort, insights, habit impact and 7-day averages (`c85315f`).
 - B4 Counters: water, caffeine and alcohol counts with − / + on Today (for today) and on Journal (any day, with 30-day averages); counts alone don't check a day in, and the Alcohol count sets the Alcohol tag (`651b79c`).
 - E1 Copy for AI: Sync Center → "Share with AI" copies (or shares) a text summary of today, 7/30/90 days or a custom range — daily table, workouts, comparison with the 30 days before, overnight vitals, insights and a prompt asking for advice; no name, Garmin ids or workout titles (`d556c8d`).
+- F1 Workout lab: `#/lab` imports Garmin FIT files (single-workout zips, the account export, watch files) with an own FIT decoder; per workout: linked pace/HR/cadence/elevation charts with a no-map route, km splits, watch zones, run/walk, pauses, recovery HR, target time, drift, coverage and the night after; across runs: fitness or effort, distance per heartbeat, pace by zone, best efforts and goal, recovery after hard runs (`TBD`).

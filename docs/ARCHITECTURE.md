@@ -47,6 +47,12 @@ src/
     migrate.js           one-time import of v1 cached data
     portable.js          JSON export/import + CSV builders
     demo.js              deterministic 400-day demo data generator
+    fit.js               FIT binary decoder (written from the public protocol; Garmin's SDK can't be redistributed)
+    fitNormalize.js      decoded FIT messages → FitWorkout + FitSeries (scales, pauses, laps, run/walk, zones, recovery HR)
+    fitImport.js         picked files/zips → batches of workouts + samples + original bytes; dedupe by hash and id
+    zip.js               zip reader that slices the file (nested zips, ZIP64) so a 1 GB account export never loads whole
+    fitEncode.js         small FIT writer, for tests and demo data
+    demoFit.js           demo FIT files for the demo runs (synthetic loop in the ocean, never real places)
   lib/
     dates.js             local day-key helpers (the only date code to use)
     format.js            number / duration / date formatting (en-IN)
@@ -59,6 +65,7 @@ src/
     timeline.js          one day's window (opens at last night's bedtime): sleep and workout segments, gap-broken HR and Body Battery, stats, hourly rows, events
     health.js            health monitor: overnight vitals against your own 30-night normal range
     habits.js            habit impact: the night after tagged days against logged days without the tag (≥ 5 each way, sample sizes, clear vs varies)
+    fitAnalysis.js       Workout lab: km splits, distance per heartbeat, zones, best efforts, run shape, drift, target time, coverage; across runs: fitness-or-effort, pace by zone, goal, recovery after hard runs
     aiSummary.js         "Copy for AI" (Sync Center): plain-text summary of a day or range — daily table, workouts, vs the 30 days before, vitals, insights, a prompt; no name, ids or workout titles
     activities.js        activity helpers (type groups, pace, training effect, load)
     name.js              greeting-name resolution (local override, ignores Garmin UUIDs)
@@ -127,10 +134,13 @@ Actions: `init`, `applyDays`, `applyActivities`, `setProfile`, `setJournal`, `to
 
 | Where | Key | What |
 |---|---|---|
-| IndexedDB `garmin-personal-dashboard` (v3) | store `days` (keyPath `date`) | DayRecords |
+| IndexedDB `garmin-personal-dashboard` (v4) | store `days` (keyPath `date`) | DayRecords |
 | | store `activities` (keyPath `id`) | Activities |
 | | store `journal` (keyPath `date`) | JournalEntries (user-entered tags) |
-| | store `meta` | `profile`, `syncMeta`, `endpoints`, `log`, `demoJournal` |
+| | store `fitWorkouts` (keyPath `id`) | FitWorkouts — imported FIT summaries, loaded at start into `fitWorkouts` |
+| | store `fitSeries` (keyPath `id`) | FitSeries — samples, read one workout at a time (`actions.getFitSeries`) |
+| | store `fitFiles` (keyPath `id` = SHA-256) | original FIT bytes, kept so a newer parser can re-read them |
+| | store `meta` | `profile`, `syncMeta`, `endpoints`, `log`, `demoJournal`, `demoFit` |
 | | store `data` | legacy v1 blobs — migrated then cleared by `migrate.js` |
 | IndexedDB `mk-fitness-demo` | same stores | demo data only |
 | localStorage | `garmin_dashboard_session` | `{ accessToken, expiresAt }` — the API key itself is never stored |
@@ -205,6 +215,7 @@ Hash routes (work on static hosting): `useRoute()` → `{ path, segments, params
 | `#/reports`, `#/reports/:kind?range=` (recovery and timeline also `&date=`, habits `&m=`) | `pages/Reports.jsx`, `pages/reports/*` (map in `App.jsx` `REPORTS`) |
 | `#/activities`, `#/activities/:id` | `pages/Activities.jsx`, `pages/ActivityDetail.jsx` |
 | `#/journal?date=` | `pages/Journal.jsx` |
+| `#/lab`, `#/lab/:id` | `pages/Lab.jsx` (import + across runs), `pages/LabWorkout.jsx` (one imported FIT workout) |
 | `#/insights` | `pages/Insights.jsx` |
 | `#/sync` | `pages/SyncCenter.jsx` |
 | `#/settings` | `pages/Settings.jsx` |

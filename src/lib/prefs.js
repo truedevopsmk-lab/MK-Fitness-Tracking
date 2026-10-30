@@ -16,6 +16,8 @@ export const DEFAULT_PREFS = {
   lockAfterMin: 5,
   installDismissed: false,
   displayName: '',         // optional local override for the greeting; never synced or exported
+  runGoalM: 10000,         // Workout lab running goal: distance (m) and target time (s)
+  runGoalSec: 2940,
 }
 
 let cache = null

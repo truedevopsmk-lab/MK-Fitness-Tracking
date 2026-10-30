@@ -129,6 +129,34 @@ Why things are the way they are. Read before "fixing" something that looks odd.
   stage hues plus the other three would exceed four hues. There is no stress curve because Garmin does not
   send one to Personal API keys.
 
+### Workout lab (FIT import)
+
+- **Own FIT decoder instead of Garmin's SDK.** `@garmin/fitsdk` may not be redistributed (its licence bars making it
+  available to third parties) and adds ~65 KB gzipped. `src/data/fit.js` is ~120 lines written from the public FIT
+  protocol and was checked field-for-field against the SDK on a real Fenix 6 file (233 records, session, laps, splits).
+- **Import, not download, for now.** The app's Personal API key has no documented FIT download endpoint; the owner exports
+  files from Garmin Connect (single workout or the full account export). The zip reader slices the file, so a 1 GB
+  export never loads whole on an iPhone. Probing a download endpoint is the next step (HANDOFF §6).
+- **Kept apart from synced activities.** FIT workouts live in their own stores and never overwrite `activities`; the
+  page links to the synced activity by Garmin id or start time (±2 min). Ids are watch serial + FIT start time, so the
+  same workout re-exported is a duplicate; file hashes catch identical files.
+- **Original files are kept** (`fitFiles`) so a newer parser can re-read them; samples are stored columnar and read one
+  workout at a time, so start-up only loads summaries.
+- **Timer time, time-weighted.** Garmin's smart recording writes samples every 1–10 s, so every average is weighted by
+  the time between samples, and charts use timer time (pauses left out). Elapsed time is shown alongside.
+- **The watch's zones, never mixed.** Zone time comes from the watch's `time_in_zone` message with its own limits
+  (e.g. % of max 188). Only when a file has limits but no zone time are zones calculated from samples, and the card
+  says so.
+- **Missing is missing.** Channels a file didn't record (power, running dynamics, beat-to-beat) are listed as "Not in
+  this file" in the coverage card, never zeros.
+- **Thresholds:** running = speed ≥ 1.8 m/s; efficiency (distance per heartbeat) skips the first 5 min and needs 5 min of
+  running; pace in a zone needs 3 min in it; drift needs 20 min of steady running and an even-paced run; "Fitness or
+  effort?" needs 8 runs (last 6 vs 6 before, ±2% counts as the same); recovery comparisons need 5 hard and 5 easier runs
+  with next-morning HRV; hard = aerobic TE ≥ 3.5 or 40%+ in zones 4–5; HRV "back" = within 3% of the run's 7-night
+  average. The goal estimate is Riegel (^1.06) from a 5 km+ best effort in the last 90 days, labelled as not Garmin's.
+- **No map tiles.** The route is an SVG polyline of the file's GPS points; tiles would send the location to a third party.
+  Demo GPS is a loop in the ocean at 0.5°N 0.5°E, never a real place.
+
 ## UI
 
 - **iPhone first.** Bottom nav, ≥ 44px targets, safe areas, pull-to-refresh, one-screen Morning check.
